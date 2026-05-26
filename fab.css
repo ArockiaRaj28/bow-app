@@ -1,0 +1,247 @@
+ * BOW v6.0 - FAB Styling
+ * File: components/fab.css
+ * 
+ * Floating action button styles, animations, and responsive design.
+ */
+
+/* ════════════════════════════════════ */
+/* FAB CONTAINER & OVERLAY             */
+/* ════════════════════════════════════ */
+
+#fab-container {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+#fab-container > * {
+  pointer-events: auto;
+}
+
+.fab-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 900;
+  opacity: 0;
+  animation: fadeIn 200ms ease-out forwards;
+}
+
+.fab-overlay[style*="display: none"] {
+  animation: fadeOut 200ms ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 0.5; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 0.5; }
+  to { opacity: 0; }
+}
+
+/* ════════════════════════════════════ */
+/* MAIN FAB BUTTON                      */
+/* ════════════════════════════════════ */
+
+.fab-main {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
+  outline: none;
+}
+
+.fab-main:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
+  transform: scale(1.1);
+}
+
+.fab-main:active {
+  transform: scale(0.95);
+}
+
+/* Expand state: rotate + to × */
+.fab-main.fab-expanded .fab-icon {
+  transform: rotate(45deg);
+}
+
+.fab-icon {
+  display: block;
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 300;
+}
+
+/* ════════════════════════════════════ */
+/* FAB MENU & ACTIONS                   */
+/* ════════════════════════════════════ */
+
+.fab-menu {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 950;
+}
+
+.fab-menu[style*="display: flex"] .fab-action {
+  animation: slideUp 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Individual action buttons */
+.fab-action {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: all 200ms ease-out;
+  outline: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.fab-action:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.fab-action:active {
+  transform: scale(0.9);
+}
+
+/* Action icon */
+.fab-action-icon {
+  display: block;
+  font-size: 24px;
+}
+
+/* Action label (hidden on mobile) */
+.fab-action-label {
+  position: absolute;
+  right: 60px;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease-out;
+  z-index: 1001;
+}
+
+.fab-action:hover .fab-action-label {
+  opacity: 1;
+}
+
+/* ════════════════════════════════════ */
+/* TABLET LAYOUT                        */
+/* ════════════════════════════════════ */
+
+@media (min-width: 768px) {
+  .fab-main {
+    bottom: 32px;
+    right: 32px;
+  }
+
+  .fab-menu {
+    bottom: 32px;
+    right: 32px;
+  }
+
+  .fab-action-label {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* ════════════════════════════════════ */
+/* DESKTOP LAYOUT                       */
+/* ════════════════════════════════════ */
+
+@media (min-width: 1024px) {
+  .fab-main {
+    width: 64px;
+    height: 64px;
+    font-size: 32px;
+  }
+
+  .fab-action {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+
+  .fab-main:hover {
+    transform: scale(1.15);
+  }
+
+  .fab-action:hover {
+    transform: scale(1.2);
+  }
+}
+
+/* ════════════════════════════════════ */
+/* ACCESSIBILITY                        */
+/* ════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .fab-main,
+  .fab-action,
+  .fab-icon,
+  .fab-overlay {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (hover: none) {
+  .fab-action-label {
+    display: none;
+  }
+
+  .fab-action:active .fab-action-icon {
+    transform: scale(1.2);
+  }
+}
