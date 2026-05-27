@@ -1,0 +1,379 @@
+/**
+ * BOW v6.0 - Form Styling
+ * File: styles/forms.css
+ * 
+ * Unified form styling for all modals and input fields.
+ * Mobile-first, dark theme, Japanese finance app inspired.
+ */
+
+/* ════════════════════════════════════ */
+/* FORM GROUPS                          */
+/* ════════════════════════════════════ */
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-row .form-group {
+  margin-bottom: 0;
+}
+
+/* ════════════════════════════════════ */
+/* LABELS                               */
+/* ════════════════════════════════════ */
+
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, #999);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+}
+
+/* ════════════════════════════════════ */
+/* TEXT INPUTS                          */
+/* ════════════════════════════════════ */
+
+.form-input,
+.form-input-readonly,
+.form-category-picker {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text, #fff);
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 200ms ease-out;
+  outline: none;
+}
+
+.form-input:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.form-input:focus {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Amount field styling */
+.form-amount {
+  text-align: right;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* ════════════════════════════════════ */
+/* READONLY INPUT                       */
+/* ════════════════════════════════════ */
+
+.form-input-readonly {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--muted, #999);
+  cursor: default;
+  user-select: none;
+}
+
+/* ════════════════════════════════════ */
+/* SELECT DROPDOWN                      */
+/* ════════════════════════════════════ */
+
+.form-input[type="select"],
+select.form-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23999' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+select.form-input option {
+  background: #1a1d2e;
+  color: #fff;
+}
+
+/* ════════════════════════════════════ */
+/* CATEGORY PICKER                      */
+/* ════════════════════════════════════ */
+
+.form-category-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+  padding: 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.form-category-picker:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.category-icon {
+  font-size: 20px;
+  display: block;
+}
+
+.category-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.category-arrow {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 18px;
+}
+
+/* ════════════════════════════════════ */
+/* CATEGORY PICKER GRID                 */
+/* ════════════════════════════════════ */
+
+.category-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.category-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--text, #fff);
+  cursor: pointer;
+  transition: all 200ms ease-out;
+  outline: none;
+}
+
+.category-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.category-item.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+}
+
+.category-item-icon {
+  font-size: 24px;
+}
+
+.category-item-name {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* ════════════════════════════════════ */
+/* DAYS SELECTOR (for templates)        */
+/* ════════════════════════════════════ */
+
+.days-selector {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.day-btn {
+  aspect-ratio: 1;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  color: var(--text, #fff);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease-out;
+  font-size: 12px;
+  outline: none;
+}
+
+.day-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.day-btn.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+/* ════════════════════════════════════ */
+/* COLOR SELECTOR (for templates)       */
+/* ════════════════════════════════════ */
+
+.color-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.color-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 200ms ease-out;
+  outline: none;
+}
+
+.color-btn:hover {
+  transform: scale(1.1);
+}
+
+.color-btn[data-selected="true"] {
+  border-color: white;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+/* ════════════════════════════════════ */
+/* CHECKBOX & TOGGLE                    */
+/* ════════════════════════════════════ */
+
+.form-checkbox,
+.form-toggle {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 200ms ease-out;
+  outline: none;
+}
+
+.form-checkbox:checked {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.form-checkbox:checked::after {
+  content: '✓';
+  color: white;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ════════════════════════════════════ */
+/* NUMBER INPUT SPINNER HIDE            */
+/* ════════════════════════════════════ */
+
+.form-input[type="number"]::-webkit-outer-spin-button,
+.form-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.form-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ════════════════════════════════════ */
+/* DISABLED STATE                       */
+/* ════════════════════════════════════ */
+
+.form-input:disabled,
+.form-category-picker:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ════════════════════════════════════ */
+/* ERROR STATE                          */
+/* ════════════════════════════════════ */
+
+.form-input.form-error {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.form-error-message {
+  font-size: 11px;
+  color: #ef4444;
+  margin-top: -2px;
+}
+
+/* ════════════════════════════════════ */
+/* TABLET                               */
+/* ════════════════════════════════════ */
+
+@media (min-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .category-picker {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .days-selector {
+    grid-template-columns: repeat(7, 1fr);
+  }
+}
+
+/* ════════════════════════════════════ */
+/* ACCESSIBILITY                        */
+/* ════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .form-input,
+  .form-category-picker,
+  .day-btn,
+  .color-btn {
+    transition: none !important;
+  }
+}
+
+/* Focus visible for keyboard nav */
+.form-input:focus-visible,
+select.form-input:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: more) {
+  .form-input {
+    border-width: 2px;
+  }
+
+  .form-category-picker {
+    border-width: 2px;
+  }
+}
