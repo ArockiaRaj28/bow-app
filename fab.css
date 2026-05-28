@@ -47,13 +47,15 @@
 }
 
 /* ════════════════════════════════════ */
-/* MAIN FAB BUTTON                      */
+/* MAIN FAB BUTTON - LOWER POSITION    */
 /* ════════════════════════════════════ */
 
 .fab-main {
     position: fixed;
     right: 18px;
-    bottom: calc(88px + env(safe-area-inset-bottom));
+
+    /* LOWERED POSITION */
+    bottom: calc(72px + env(safe-area-inset-bottom));
 
     width: 62px;
     height: 62px;
@@ -61,15 +63,10 @@
 
     border: none;
     outline: none;
-    cursor: pointer;
 
     display: flex;
     align-items: center;
     justify-content: center;
-
-    color: #ffffff;
-    font-size: 28px;
-    font-weight: 300;
 
     background: linear-gradient(
         135deg,
@@ -77,23 +74,93 @@
         #3b82f6 100%
     );
 
-    box-shadow:
-        0 8px 24px rgba(59, 130, 246, 0.25);
+    color: white;
+    font-size: 28px;
 
-    transition:
-        transform 0.25s ease,
-        box-shadow 0.25s ease,
-        background 0.25s ease;
+    z-index: 1001;
+
+    box-shadow:
+        0 6px 18px rgba(59,130,246,0.28);
+
+    transition: all 0.25s ease;
+}
+
+/* ════════════════════════════════════ */
+/* FAB MENU FIX                        */
+/* ════════════════════════════════════ */
+
+.fab-menu {
+    position: fixed;
+
+    right: 18px;
+
+    /* MENU STARTS ABOVE BUTTON */
+    bottom: calc(145px + env(safe-area-inset-bottom));
+
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+
+    gap: 12px;
 
     z-index: 1000;
+
+    /* IMPORTANT */
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+
+    transform: translateY(10px);
+
+    transition:
+        opacity 0.22s ease,
+        transform 0.22s ease,
+        visibility 0.22s;
 }
 
-.fab-main:active {
-    transform: scale(0.92);
+/* OPEN STATE */
+.fab-menu.active {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
 }
 
-.fab-main.fab-expanded {
-    transform: rotate(45deg);
+/* ════════════════════════════════════ */
+/* ACTION BUTTONS                      */
+/* ════════════════════════════════════ */
+
+.fab-action {
+    min-width: 180px;
+    height: 50px;
+
+    padding: 0 18px;
+
+    border-radius: 18px;
+    border: none;
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 3px 12px rgba(0,0,0,0.22);
+
+    transition:
+        transform 0.18s ease,
+        opacity 0.18s ease;
+
+    animation: fabSlideUp 0.22s ease;
+}
+
+.fab-action:active {
+    transform: scale(0.96);
 }
 
 /* ════════════════════════════════════ */
