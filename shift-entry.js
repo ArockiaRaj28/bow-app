@@ -1,99 +1,94 @@
 /**
- * BOW v6.0 - Shift Entry Modal
- * File: pages/shift-entry.js
- * 
- * Quick shift logging with auto-detection of next empty date.
+ * BOW v6.0 - Actual Time Modal (Login/Logout)
  */
 
-const ShiftEntry = (() => {
-  let selectedJob = null;
+const ActualTime = (() => {
   let isSaving = false;
 
-  /**
-   * Open shift entry modal
-   */
   function open() {
-    // Auto-detect next empty date
-    const nextDate = findNextEmptyDate();
-    
-    // Get last used job
-    selectedJob = getLastUsedJob();
-    
-    const dateStr = formatDate(nextDate);
-    const lastTiming = getLastShiftTiming();
+    const today = formatDate(new Date());
+    const now = formatTime(new Date());
+
+    // Get scheduled shift for today
+    const scheduledShift = getTodayScheduledShift();
 
     const content = `
       <div class="form-group">
         <label class="form-label">Date</label>
-        <div class="form-input-readonly">${formatDateDisplay(nextDate)}</div>
+        <div class="form-input-readonly">${today}</div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Job</label>
-        <select class="form-input" id="shiftJob">
-          <option value="">Select a job...</option>
-          ${getJobOptions()}
-        </select>
-      </div>
+      ${scheduledShift ? `
+        <div class="form-group" style="background:rgba(59,130,246,0.1);padding:12px;border-radius:8px;margin-bottom:12px;">
+          <label class="form-label" style="margin-bottom:8px;">Scheduled Shift</label>
+          <div style="font-size:13px;color:var(--muted);">
+            <div>${scheduledShift.job}</div>
+            <div>${scheduledShift.start} - ${scheduledShift.end}</div>
+          </div>
+        </div>
+      ` : ''}
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Start Time</label>
+          <label class="form-label">Actual Login</label>
           <input 
             type="time" 
             class="form-input"
-            id="shiftStart"
-            value="${lastTiming.start || '09:00'}"
+            id="actualLogin"
+            value="${now}"
           >
         </div>
         <div class="form-group">
-          <label class="form-label">End Time</label>
+          <label class="form-label">Actual Logout</label>
           <input 
             type="time" 
             class="form-input"
-            id="shiftEnd"
-            value="${lastTiming.end || '18:00'}"
+            id="actualLogout"
+            value="${now}"
           >
         </div>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Breaks (minutes)</label>
+        <label class="form-label">Break Changes (minutes)</label>
         <input 
           type="number" 
           class="form-input"
-          id="shiftBreaks"
+          id="breakChanges"
           value="0"
-          min="0"
+          placeholder="0 for no changes"
         >
       </div>
 
       <div class="form-group">
-        <label class="form-label">Estimated Earnings</label>
-        <div class="form-input-readonly" id="estimatedEarnings">
+        <label class="form-label">Actual Earnings</label>
+        <div class="form-input-readonly" id="actualEarnings">
           ¥0
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">
+          Based on actual login/logout times
         </div>
       </div>
     `;
 
     const buttons = [
       {
-        label: 'Save',
+        label: 'Save Actuals',
         action: 'save',
         class: 'modal-btn-primary',
         onClick: handleSave,
       },
       {
-        label: 'Save + Continue',
-        action: 'save-continue',
+        label: 'Save + Log Again',
+        action: 'save-again',
         class: 'modal-btn-success',
-        onClick: handleSaveContinue,
+        onClick: handleSaveAgain,
       },
     ];
 
     Modal.open({
-      id: 'shift-entry',
-      title: '📅 Add Shift',
+      id: 'actual-time',
+      title: '⏱ Actual Time',
       content,
       buttons,
       onClose: cleanup,
@@ -102,166 +97,102 @@ const ShiftEntry = (() => {
     attachListeners();
   }
 
-  /**
-   * Attach listeners and setup real-time calculation
-   */
   function attachListeners() {
-    const jobSelect = document.getElementById('shiftJob');
-    const startInput = document.getElementById('shiftStart');
-    const endInput = document.getElementById('shiftEnd');
-    const breaksInput = document.getElementById('shiftBreaks');
+    const loginInput = document.getElementById('actualLogin');
+    const logoutInput = document.getElementById('actualLogout');
+    const breaksInput = document.getElementById('breakChanges');
 
-    if (jobSelect) {
-      jobSelect.addEventListener('change', (e) => {
-        selectedJob = e.target.value;
-      });
-    }
-
-    // Real-time earnings calculation
     const updateEarnings = () => {
-      const earnings = calculateEstimatedEarnings(startInput.value, endInput.value, parseInt(breaksInput.value || 0));
-      const earningsDiv = document.getElementById('estimatedEarnings');
+      const earnings = calculateActualEarnings(
+        loginInput.value,
+        logoutInput.value,
+        parseInt(breaksInput.value || 0)
+      );
+      const earningsDiv = document.getElementById('actualEarnings');
       if (earningsDiv) {
         earningsDiv.textContent = `¥${earnings.toLocaleString('ja-JP')}`;
       }
     };
 
-    if (startInput) startInput.addEventListener('change', updateEarnings);
-    if (endInput) endInput.addEventListener('change', updateEarnings);
+    if (loginInput) loginInput.addEventListener('change', updateEarnings);
+    if (logoutInput) logoutInput.addEventListener('change', updateEarnings);
     if (breaksInput) breaksInput.addEventListener('change', updateEarnings);
 
-    // Initial calculation
     updateEarnings();
-
-    // Focus job select
-    if (jobSelect) {
-      setTimeout(() => jobSelect.focus(), 100);
-    }
+    if (loginInput) setTimeout(() => loginInput.focus(), 100);
   }
 
-  /**
-   * Handle save
-   */
   function handleSave() {
-    if (saveShift()) {
+    if (saveActualTime()) {
       Modal.close();
     }
   }
 
-  /**
-   * Handle save and continue
-   */
-  function handleSaveContinue() {
-    if (saveShift()) {
+  function handleSaveAgain() {
+    if (saveActualTime()) {
       open();
     }
   }
 
-  /**
-   * Save shift
-   */
-  function saveShift() {
+  function saveActualTime() {
     if (isSaving) return false;
 
-    const date = document.querySelector('.form-input-readonly')?.textContent;
-    const job = document.getElementById('shiftJob').value;
-    const start = document.getElementById('shiftStart').value;
-    const end = document.getElementById('shiftEnd').value;
-    const breaks = parseInt(document.getElementById('shiftBreaks').value || 0);
+    const login = document.getElementById('actualLogin').value;
+    const logout = document.getElementById('actualLogout').value;
+    const breakChanges = parseInt(document.getElementById('breakChanges').value || 0);
 
-    if (!job || !start || !end) {
-      alert('Please fill all fields');
+    if (!login || !logout) {
+      alert('Please enter login and logout times');
       return false;
     }
 
     isSaving = true;
 
-    // Create shift object
-    const shift = {
-      date,
-      job,
-      startTime: start,
-      endTime: end,
-      breaks,
-      scheduledEarnings: calculateEstimatedEarnings(start, end, breaks),
+    const actualData = {
+      date: formatDate(new Date()),
+      actualLogin: login,
+      actualLogout: logout,
+      breakChanges,
+      actualEarnings: calculateActualEarnings(login, logout, breakChanges),
     };
 
     // Save to app
-    if (window.saveBudgetShift) {
-      window.saveBudgetShift(shift);
+    if (window.saveActualShift) {
+      window.saveActualShift(actualData);
     }
 
     isSaving = false;
     return true;
   }
 
-  /**
-   * Find next empty date in shifts
-   */
-  function findNextEmptyDate() {
-    const today = new Date();
-    // For now, return tomorrow
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow;
-  }
-
-  /**
-   * Get last used job
-   */
-  function getLastUsedJob() {
-    // Placeholder - integrate with app's job tracking
+  function getTodayScheduledShift() {
+    // Placeholder - integrate with app
     return null;
   }
 
-  /**
-   * Get last shift timing
-   */
-  function getLastShiftTiming() {
-    // Placeholder - integrate with app's shift history
-    return { start: '09:00', end: '18:00' };
-  }
+  function calculateActualEarnings(login, logout, breakChanges) {
+    if (!login || !logout) return 0;
 
-  /**
-   * Get job options
-   */
-  function getJobOptions() {
-    // Placeholder - get from app's jobs
-    return `<option value="job1">McDonald's</option>`;
-  }
+    const [lH, lM] = login.split(':').map(Number);
+    const [oH, oM] = logout.split(':').map(Number);
 
-  /**
-   * Calculate estimated earnings (SCHEDULED times only)
-   */
-  function calculateEstimatedEarnings(start, end, breaks) {
-    if (!start || !end) return 0;
+    const loginMin = lH * 60 + lM;
+    const logoutMin = oH * 60 + oM;
 
-    const [startH, startM] = start.split(':').map(Number);
-    const [endH, endM] = end.split(':').map(Number);
+    let duration = logoutMin - loginMin;
+    if (duration < 0) duration += 24 * 60;
 
-    const startMin = startH * 60 + startM;
-    const endMin = endH * 60 + endM;
-
-    let durationMin = endMin - startMin;
-    if (durationMin < 0) durationMin += 24 * 60; // Next day
-
-    const workMin = durationMin - breaks;
-    const hourlyRate = 1000; // Placeholder
+    const actualBreaks = (getTodayScheduledShift()?.breaks || 0) + breakChanges;
+    const workMin = duration - actualBreaks;
+    const hourlyRate = 1000;
 
     return Math.round((workMin / 60) * hourlyRate);
   }
 
-  /**
-   * Cleanup
-   */
   function cleanup() {
-    selectedJob = null;
     isSaving = false;
   }
 
-  /**
-   * Helpers
-   */
   function formatDate(date) {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -269,15 +200,12 @@ const ShiftEntry = (() => {
     return `${y}-${m}-${d}`;
   }
 
-  function formatDateDisplay(date) {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const day = days[date.getDay()];
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} (${day})`;
+  function formatTime(date) {
+    const h = String(date.getHours()).padStart(2, '0');
+    const m = String(date.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
   }
 
-  /**
-   * Public API
-   */
   return {
     open,
   };
