@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Japan Work Hours Calendar</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/style.css">
-<link rel="stylesheet" href="assets/css/fab.css">
-<link rel="stylesheet" href="assets/css/modal.css">
-<link rel="stylesheet" href="assets/css/forms.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/fab.css">
+<link rel="stylesheet" href="css/modal.css">
+<link rel="stylesheet" href="css/forms.css">
 </head>
 <body>
 
@@ -490,12 +490,29 @@
 </div>
 <div id="fab-container"></div>
 <div id="modal-container"></div>
-<script src="assets/js/app.js"></script>
-<script src="assets/js/modal.js"></script>
-<script src="assets/js/fab.js"></script>
-<script src="assets/js/expense-entry.js"></script>
-<script src="assets/js/shift-entry.js"></script>
-<script src="assets/js/actual-time.js"></script>
-<script src="assets/js/template-entry.js"></script>
+<!-- ── Core: must load first ─────────────────── -->
+<script src="js/modules/storage.js"></script>
+<script src="js/modules/calculations.js"></script>
+<script src="js/app.js"></script>
+
+<!-- ── Feature modules ──────────────────────── -->
+<script src="js/modules/calendar.js"></script>
+<script src="js/modules/day-modal.js"></script>
+<script src="js/modules/job-manager.js"></script>
+<script src="js/modules/shift-form.js"></script>
+<script src="js/modules/templates.js"></script>
+<script src="js/modules/export-import.js"></script>
+<script src="js/modules/navigation.js"></script>
+<script src="js/modules/transactions.js"></script>
+<script src="js/modules/budget.js"></script>
+<script src="js/modules/dev-story.js"></script>
+
+<!-- ── FAB quick-entry system ───────────────── -->
+<script src="js/modal.js"></script>
+<script src="js/fab.js"></script>
+<script src="js/expense-entry.js"></script>
+<script src="js/shift-entry.js"></script>
+<script src="js/actual-time.js"></script>
+<script src="js/template-entry.js"></script>
 </body>
 </html>
