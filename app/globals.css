@@ -75,3 +75,7 @@ select { appearance: none; cursor: pointer; }
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.5; }
 }
+
+/* Horizontal pill tab bar — hide the scrollbar without losing scrollability */
+.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }

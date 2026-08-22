@@ -52,7 +52,7 @@ export default function AppShell({ user }: { user: AuthUser }) {
     <div style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
 
       {/* ── Header ─────────────────────────── */}
-      <Topbar userName={user.name} />
+      <Topbar />
       <TopTabs />
 
       {/* ── Main Tab Content ───────────────── */}

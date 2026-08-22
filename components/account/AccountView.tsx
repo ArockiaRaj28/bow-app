@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Settings } from 'lucide-react'
 import { AuthUser } from '@/lib/auth/session'
 import { updateAccount, resendVerificationEmailAction } from '@/app/actions/account'
+import { logoutAction } from '@/app/auth/actions'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import SettingsView from '@/components/settings/SettingsView'
@@ -351,6 +352,27 @@ export default function AccountView({ user }: { user: AuthUser }) {
           <SettingsView />
         </div>
       )}
+
+      {/* ── Sign out — lives here, not in the top bar ── */}
+      <div style={{ padding: '24px 16px 8px' }}>
+        <form action={logoutAction}>
+          <button
+            type="submit"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '12px 16px',
+              background: 'rgba(239,68,68,0.09)',
+              border: '1px solid rgba(239,68,68,0.28)',
+              borderRadius: 12,
+              color: '#fca5a5',
+              fontSize: 13, fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Sign out{user?.name ? ` (${user.name})` : ''}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

@@ -1,54 +1,73 @@
 'use client'
 
+import {
+  CalendarDays, Repeat, Wallet, ReceiptText, BarChart3, User,
+} from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import type { TopTab } from '@/types'
 
-const TABS: { id: TopTab; label: string }[] = [
-  { id: 'calendar',  label: '📅 Calendar'  },
-  { id: 'templates', label: '🔁 Templates' },
-  { id: 'budget',    label: '💰 Budget'    },
-  { id: 'expenses',  label: '💴 Expenses'  },
-  { id: 'summary',   label: '📊 Insights & Analysis' },
-  { id: 'account',   label: '👤 Account'   },
+const TABS: { id: TopTab; label: string; Icon: typeof CalendarDays }[] = [
+  { id: 'calendar',  label: 'Calendar',  Icon: CalendarDays },
+  { id: 'templates', label: 'Templates', Icon: Repeat },
+  { id: 'budget',    label: 'Budget',    Icon: Wallet },
+  { id: 'expenses',  label: 'Expenses',  Icon: ReceiptText },
+  { id: 'summary',   label: 'Insights',  Icon: BarChart3 },
+  { id: 'account',   label: 'Account',   Icon: User },
 ]
 
+/**
+ * Pill-style tab bar.
+ *
+ * Icon + short label, active tab highlighted as a rounded pill —
+ * no uppercase cramming, no underlines. Horizontally scrollable on
+ * narrow screens with the scrollbar hidden; sticky under the header.
+ */
 export default function TopTabs() {
   const { activeTab, setTab } = useAppStore()
 
   return (
-    <nav style={{
-      display: 'flex',
-      background: 'var(--surface)',
-      borderBottom: '1px solid var(--border)',
-      overflowX: 'auto',
-      position: 'sticky',
-      top: 44,
-      zIndex: 99,
-    }}>
-      {TABS.map((tab) => {
-        const active = activeTab === tab.id
+    <nav
+      aria-label="Main tabs"
+      className="hide-scrollbar"
+      style={{
+        display: 'flex',
+        gap: 6,
+        padding: '8px 14px 10px 14px',
+        background: 'var(--bg)',
+        borderBottom: '1px solid var(--border)',
+        overflowX: 'auto',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+        position: 'sticky',
+        top: 53,
+        zIndex: 99,
+      }}
+    >
+      {TABS.map(({ id, label, Icon }) => {
+        const active = activeTab === id
         return (
           <button
-            key={tab.id}
-            onClick={() => setTab(tab.id)}
+            key={id}
+            onClick={() => setTab(id)}
+            aria-current={active ? 'page' : undefined}
             style={{
-              flex: 1,
-              minWidth: 80,
-              padding: '12px 10px',
-              background: 'none',
-              border: 'none',
-              borderBottom: active ? '3px solid var(--accent)' : '3px solid transparent',
+              display: 'flex', alignItems: 'center', gap: 6,
+              flex: '1 0 auto',
+              justifyContent: 'center',
+              padding: '7px 14px',
+              background: active ? 'rgba(59,130,246,0.13)' : 'transparent',
+              border: `1px solid ${active ? 'rgba(59,130,246,0.32)' : 'var(--border)'}`,
+              borderRadius: 999,
               color: active ? 'var(--accent)' : 'var(--muted)',
-              fontSize: 11,
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 700,
               whiteSpace: 'nowrap',
-              transition: 'color 150ms ease, border-color 150ms ease',
+              cursor: 'pointer',
+              transition: 'color 140ms ease, background 140ms ease, border-color 140ms ease',
             }}
           >
-            {tab.label}
+            <Icon size={13.5} strokeWidth={2.2} />
+            {label}
           </button>
         )
       })}
