@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { saveCategoryBudgetByName } from '@/app/actions/expenses'
 import { getDayHours, getNightHours } from '@/lib/dayHours'
 import { dateKey } from '@/lib/dateUtils'
@@ -10,13 +10,22 @@ import { useJobsStore } from '@/store/useJobsStore'
 import { MONTH_NAMES, DEFAULT_CATEGORIES } from '@/lib/constants'
 import { parseMonthKey } from '@/lib/dateUtils'
 import { formatYen } from '@/lib/timeUtils'
+import type { BudgetGoal } from '@/types'
 import BudgetGoalCard from './BudgetGoalCard'
+import GoalFormModal from './GoalFormModal'
 import ProgressBar from '@/components/ui/ProgressBar'
 
 export default function BudgetView() {
   const { currentMonth, budgets, ensureMonth, prevMonth, nextMonth, recalculate,
           addGoal } = useBudgetStore()
   const { jobs } = useJobsStore()
+
+  // Goal create/edit runs through the GoalFormModal — the old
+  // triple-window.prompt() flow is gone. (Hook: must sit above the
+  // `if (!month)` render guard below.)
+  const [goalForm, setGoalForm] = useState<{ open: boolean; editing: BudgetGoal | null }>({
+    open: false, editing: null,
+  })
 
   // Hydrate goals + notes from Neon once per month. Awaited separately so
   // the render can fall through to the empty-state if the month is fresh.
@@ -152,27 +161,6 @@ export default function BudgetView() {
   const remaining  = Math.max(0, earned - totalSpent)
   const savings    = Math.max(0, earned - totalSpent)
 
-  const handleAddGoal = () => {
-    const name = window.prompt('Goal name:')
-    if (!name?.trim()) return
-    const targetStr = window.prompt('Target amount (¥):')
-    if (!targetStr) return
-    const target = parseInt(targetStr)
-    if (isNaN(target) || target <= 0) return alert('Invalid amount')
-    const deadline = window.prompt('Deadline (YYYY-MM-DD):')
-    if (!deadline) return
-    addGoal(currentMonth, {
-      id: String(Date.now()),
-      name: name.trim(), deadline, target,
-      percentage: 0,
-      priority: (month.goals || []).length + 1,
-      createdMonth: currentMonth,
-      monthlyProgress: {},
-      cumulativeAmount: 0,
-      status: 'active',
-    })
-  }
-
   const handleSaveBudget = async (catName: string, budget: number) => {
     try {
       await saveCategoryBudgetByName(catName, budget)
@@ -272,7 +260,7 @@ export default function BudgetView() {
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Savings Goals
           </div>
-          <button onClick={handleAddGoal} style={smallBtn}>+ Goal</button>
+          <button onClick={() => setGoalForm({ open: true, editing: null })} style={smallBtn}>+ Goal</button>
         </div>
         {(month.goals || []).length === 0 && (
           <div style={{ color: 'var(--muted)', fontSize: 12, padding: '8px 0' }}>No goals yet. Add one to start saving!</div>
@@ -284,9 +272,19 @@ export default function BudgetView() {
             monthKey={currentMonth}
             monthlyAllocated={(month.goalAllocations || {})[goal.id] || 0}
             savings={savings}
+            onEdit={() => setGoalForm({ open: true, editing: goal })}
           />
         ))}
       </div>
+
+      {/* Goal create/edit modal */}
+      {goalForm.open && (
+        <GoalFormModal
+          monthKey={currentMonth}
+          editing={goalForm.editing}
+          onClose={() => setGoalForm({ open: false, editing: null })}
+        />
+      )}
     </div>
   )
 }

@@ -31,6 +31,11 @@ interface BudgetState {
   // Goals (server-backed)
   addGoal: (mk: string, goal: BudgetGoal) => Promise<void>
   updateGoalPercentage: (mk: string, goalId: string, pct: number) => Promise<void>
+  updateGoal: (
+    mk: string,
+    goalId: string,
+    data: Partial<Pick<BudgetGoal, 'name' | 'target' | 'deadline' | 'percentage'>>,
+  ) => Promise<void>
   deleteGoal: (mk: string, goalId: string) => Promise<void>
   recalculate: (mk: string, jobs: import('@/types').Job[]) => Promise<void>
   setBudgets: (b: BudgetsStore) => void
@@ -243,6 +248,28 @@ export const useBudgetStore = create<BudgetState>()(
           const updated = {
             ...month,
             goals: month.goals.map((g) => g.id === goalId ? { ...g, percentage: pct } : g),
+          }
+          const derived = derive(updated, mk, jobs)
+          return { budgets: { ...s.budgets, [mk]: derived } }
+        })
+      } catch {
+        // silent — local store stays stable
+      }
+    },
+
+    /** Edit a goal's core fields (name / target / deadline / percentage).
+     *  Persists via the updateBudgetGoal action then patches the month. */
+    updateGoal: async (mk, goalId, data) => {
+      try {
+        const row = await updateBudgetGoal(goalId, data)
+        if (!row) return
+        set((s) => {
+          const month = s.budgets[mk]
+          if (!month) return {}
+          const jobs = (s as any).__jobs ?? []
+          const updated = {
+            ...month,
+            goals: month.goals.map((g) => g.id === goalId ? { ...g, ...data } : g),
           }
           const derived = derive(updated, mk, jobs)
           return { budgets: { ...s.budgets, [mk]: derived } }
