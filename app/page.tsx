@@ -68,13 +68,27 @@ const privacyFeatures = [
   { title: 'No Tracking', desc: 'We don\'t sell or share your data with anyone, ever.' },
 ];
 
-// Roadmap reflects work that is actually in flight, not aspirational fluff.
+// Roadmap reflects what is actually shipped vs. planned next — kept in
+// sync with PROJECT_STATUS.md. Shipped items match the running app.
+const shippedItems = [
+  'Shift calendar + 28h visa guard',
+  'Per-minute night-pay engine (22:00–05:00)',
+  'Jobs, templates & one-tap apply',
+  'Zero-based budget + savings goals',
+  'Expense categories & monthly log',
+  'Backup export / import (JSON + CSV)',
+  'Handle-based accounts (username login)',
+  'Admin dashboard & user feedback (v7.1)',
+];
+
 const roadmapItems = [
-  'Multi-job defaults',
-  'Cloud sync opt-in',
-  'PWA install (offline)',
-  'Receipt photo capture',
-  'AI spending insights',
+  'Smart weekly visa guard (v7.2)',
+  'Payday forecast & goal planner (v7.2)',
+  'Recurring bills & reminders (v7.3)',
+  'Monthly report + PDF export (v7.4)',
+  'Job-specific paydays & transport rules (v7.5)',
+  'PWA polish & offline read-only (v7.6)',
+  'AI spending insights & receipts (v7.7)',
 ];
 
 export default function LandingPage() {
@@ -310,7 +324,16 @@ export default function LandingPage() {
 
               {/* Roadmap */}
               <div className="roadmap-card">
-                <h2 className="roadmap-title">Coming Soon</h2>
+                <h2 className="roadmap-title">Live Now</h2>
+                <ul className="roadmap-list">
+                  {shippedItems.map((item, i) => (
+                    <li key={i} className="roadmap-item">
+                      <div className="roadmap-dot"></div>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <h2 className="roadmap-title" style={{ marginTop: 24 }}>Coming Next</h2>
                 <ul className="roadmap-list">
                   {roadmapItems.map((item, i) => (
                     <li key={i} className="roadmap-item">
