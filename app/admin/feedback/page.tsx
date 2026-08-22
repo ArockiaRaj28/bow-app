@@ -198,6 +198,9 @@ function typeColor(type: 'REVIEW' | 'FEATURE' | 'BUG' | 'OTHER'): 'green' | 'amb
     case 'BUG':     return 'red'
     case 'OTHER':   return 'amber'
   }
+  // DB has no enum constraint on type — legacy or manual rows may carry
+  // anything; an unknown must never crash the whole admin page.
+  return 'amber'
 }
 const TYPE_COLORS = {
   green:  { fg: '#34d399', bg: 'rgba(16,185,129,0.12)',  ring: 'rgba(16,185,129,0.28)' },
