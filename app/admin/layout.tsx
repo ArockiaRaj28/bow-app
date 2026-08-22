@@ -1,20 +1,20 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
+import { LogOut } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/session'
 import { logoutAction } from '@/app/auth/actions'
 import { prisma } from '@/lib/auth/prisma'
+import AdminNav from './AdminNav'
 
 /**
  * Admin route group shell.
  *
  * Plan §17: server-side guard on every admin page. We don't expose an
- * /admin/login — `requireAdmin()` is inlined here and re-applied by
- * each child page, so even if Next.js misses this layout in some edge
- * case (cache, race) the page itself still rejects non-admins.
+ * /admin/login — the guard is inlined here and re-applied by each child
+ * page, so even if Next.js misses this layout in some edge case (cache,
+ * race) the page itself still rejects non-admins.
  *
- * Cosmetic deferred: `lucide-react` icons + the existing Topbar style
- * are re-used verbatim for visual continuity. Audit log + emails +
- * analytics + feature flags / support panel land in later phases.
+ * Visual language mirrors the main app shell (slim blurred header +
+ * pill nav); the admin accent is indigo to distinguish the area.
  */
 export default async function AdminLayout({
   children,
@@ -25,8 +25,8 @@ export default async function AdminLayout({
   if (!user) redirect('/login')
   if (user.role !== 'ADMIN') redirect('/dashboard')
 
-  // Lightweight count for the admin sidebar header. Cheap aggregate
-  // query; runs on every /admin render but no client-side hydration.
+  // Lightweight count for the admin header. Cheap aggregate query; runs
+  // on every /admin render but no client-side hydration.
   const auditCount = await prisma.adminAuditLog.count().catch(() => 0)
 
   return (
@@ -38,94 +38,65 @@ export default async function AdminLayout({
     }}>
       <header style={{
         position: 'sticky', top: 0, zIndex: 100,
-        background: 'rgba(10,12,20,0.96)',
-        backdropFilter: 'blur(12px)',
+        background: 'rgba(10,12,20,0.94)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
         borderBottom: '1px solid var(--border)',
-        padding: '8px 14px',
-        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '10px 14px',
+        display: 'flex', alignItems: 'center', gap: 10,
       }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: -0.2, fontFamily: 'var(--display)' }}>
+        {/* Brand */}
+        <div style={{ minWidth: 0, marginRight: 'auto' }}>
+          <div style={{
+            fontSize: 15, fontWeight: 800, letterSpacing: -0.3,
+            whiteSpace: 'nowrap',
+            fontFamily: 'var(--display, inherit)',
+          }}>
             🛡 BOW Admin
           </div>
-          <div style={{ fontSize: 10, color: 'var(--muted)' }}>
-            {auditCount} audit {auditCount === 1 ? 'entry' : 'entries'}
+          <div style={{ fontSize: 9.5, color: 'var(--muted)', letterSpacing: '0.04em', marginTop: 1 }}>
+            {auditCount} AUDIT {auditCount === 1 ? 'ENTRY' : 'ENTRIES'}
           </div>
         </div>
+
+        {/* Role badge */}
         <span style={{
           fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
-          padding: '2px 8px', borderRadius: 20,
-          background: 'rgba(99,102,241,0.16)',
+          padding: '3px 9px', borderRadius: 999,
+          background: 'rgba(99,102,241,0.14)',
           color: '#a5b4fc',
-          border: '1px solid rgba(99,102,241,0.30)',
+          border: '1px solid rgba(99,102,241,0.32)',
         }}>
           ADMIN
         </span>
+
+        {/* Sign out — icon button, title shows who is signed in */}
         <form action={logoutAction}>
-          <button title={`Signed in as ${user.name}`} style={{
-            background: 'rgba(255,255,255,0.08)',
-            border: '1px solid var(--border)',
-            color: 'var(--text)',
-            padding: '4px 10px', borderRadius: 6,
-            fontSize: 11, fontWeight: 600,
-            cursor: 'pointer',
-          }}>
-            Logout
+          <button
+            type="submit"
+            title={`Sign out (${user.name})`}
+            aria-label="Sign out"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 32, height: 32,
+              background: 'rgba(239,68,68,0.09)',
+              border: '1px solid rgba(239,68,68,0.28)',
+              borderRadius: 10,
+              color: '#fca5a5',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            <LogOut size={15} strokeWidth={2.2} />
           </button>
         </form>
       </header>
 
-      {/* Tab-style sub-nav. Order matches the plan's recommended
-          admin pages. Audit Log slots in last — it is the newest
-          feature and gets a clear "history" position. */}
-      <nav style={{
-        display: 'flex',
-        background: 'var(--surface)',
-        borderBottom: '1px solid var(--border)',
-        overflowX: 'auto',
-        position: 'sticky',
-        top: 44,
-        zIndex: 99,
-      }}>
-        {[
-          { href: '/admin',          label: '📊 Overview' },
-          { href: '/admin/analytics', label: '📈 Analytics' },
-          { href: '/admin/users',    label: '👥 Users' },
-          { href: '/admin/emails',   label: '✉️ Emails' },
-          { href: '/admin/feedback', label: '💬 Feedback' },
-          { href: '/admin/audit-log', label: '📜 Audit Log' },
-        ].map((t) => (
-          <AdminNavLink key={t.href} href={t.href} label={t.label} />
-        ))}
-      </nav>
+      <AdminNav />
 
       <main style={{ flex: 1, padding: '20px 14px 120px 14px' }}>
         {children}
       </main>
     </div>
-  )
-}
-
-function AdminNavLink({ href, label }: { href: string; label: string }) {
-  // We can't import usePathname() into a server component, so the
-  // active-state styling is left as a default non-active look here.
-  // Marking each item as plain links keeps the surface tiny.
-  return (
-    <Link
-      href={href}
-      style={{
-        flex: 1, minWidth: 88,
-        padding: '12px 10px',
-        background: 'none', border: 'none',
-        borderBottom: '3px solid transparent',
-        color: 'var(--muted)',
-        fontSize: 11, fontWeight: 600,
-        textTransform: 'uppercase', letterSpacing: '0.5px',
-        whiteSpace: 'nowrap',
-        textAlign: 'center',
-      }}
-    >
-      {label}
-    </Link>
   )
 }
