@@ -61,6 +61,10 @@ interface ExpensesState {
   // Track ongoing loads so two views asking for the same month dedupe.
   inflightMonths: Set<string>
   inflightCategories: boolean
+  // Last month any view asked for — the cache-bust listener refetches
+  // this so an already-mounted Expenses view updates in place instead
+  // of waiting for a remount/reload.
+  lastRequestedMonth: string | null
 
   loadMonth: (mk: string) => Promise<void>
   loadCategories: () => Promise<void>
@@ -88,6 +92,7 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
   hasLoadedCategories: false,
   inflightMonths: new Set(),
   inflightCategories: false,
+  lastRequestedMonth: null,
 
   loadCategories: async () => {
     const { hasLoadedCategories, inflightCategories } = get()
@@ -108,6 +113,7 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
     },
 
     loadMonth: async (mk: string) => {
+    if (get().lastRequestedMonth !== mk) set({ lastRequestedMonth: mk })
     const state = get()
     if (state.loadedMonths.has(mk) || state.inflightMonths.has(mk)) return
     const nextInflight = new Set(state.inflightMonths)
@@ -175,7 +181,13 @@ export function startExpensesInvalidationListeners(): void {
   cacheListenersStarted = true
 
   const bust = () => {
+    const { lastRequestedMonth } = useExpensesStore.getState()
     useExpensesStore.getState().invalidate()
+    // Refetch the month the mounted view is showing — invalidate alone
+    // leaves a stale list until the view remounts.
+    if (lastRequestedMonth) {
+      void useExpensesStore.getState().loadMonth(lastRequestedMonth)
+    }
   }
 
   window.addEventListener('focus', bust)

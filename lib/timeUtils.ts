@@ -42,7 +42,11 @@ export function nowTime(): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-/** Current date as "YYYY-MM-DD" */
+/** Current date as "YYYY-MM-DD" — LOCAL calendar date, not UTC.
+ *  toISOString() returns the UTC date: for users ahead of UTC (Japan is
+ *  UTC+9) every entry made between local midnight and 09:00 would
+ *  default to yesterday. */
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

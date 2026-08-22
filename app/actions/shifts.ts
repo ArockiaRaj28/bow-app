@@ -3,7 +3,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/auth/prisma'
 import { getCurrentUser } from '@/lib/auth/session'
-import { makeUserRowId } from '@/lib/ids'
+import { formatUserRowId, nextUserSeq, withUniqueRetry } from '@/lib/ids'
 import { revalidatePath } from 'next/cache'
 import type { Break } from '@/types'
 
@@ -56,6 +56,13 @@ async function requireUserId(): Promise<string> {
   return user.id
 }
 
+/** Both identifiers needed for id minting: internal FK id + handle prefix. */
+async function requireUserForIds(): Promise<{ dbId: string; owner: string }> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+  return { dbId: user.id, owner: user.userId ?? user.id }
+}
+
 function mapShift(row: any): ShiftRow {
   return {
     id: row.id,
@@ -104,7 +111,7 @@ function validateInput(input: NewShiftInput): string | null {
 
 /** Insert one or more shifts for the authenticated user, scoped per request. */
 export async function createShifts(input: { shifts: NewShiftInput[] }): Promise<ShiftRow[]> {
-  const userId = await requireUserId()
+  const { dbId, owner } = await requireUserForIds()
   const list = input?.shifts ?? []
   if (!Array.isArray(list) || list.length === 0) {
     throw new Error('No shifts supplied')
@@ -132,7 +139,7 @@ export async function createShifts(input: { shifts: NewShiftInput[] }): Promise<
         : Prisma.JsonNull
 
     return {
-      userId,
+      userId: dbId,
       date: parseDateKey(s.date)!,
       jobId: s.jobId,
       start: s.start,
@@ -147,21 +154,124 @@ export async function createShifts(input: { shifts: NewShiftInput[] }): Promise<
   })
 
   // Generate user-prefixed ids for every row, then insert inside a
-  // transaction so all-or-nothing.
-  const rows = await prisma.$transaction(async (tx) => {
-    const ids = await Promise.all(
-      payload.map(() => makeUserRowId(userId, 's', tx as any)),
-    )
-    const created = await Promise.all(
-      payload.map((p, i) =>
-        (tx as any).userShift.create({ data: { id: ids[i], ...p } }),
-      ),
-    )
-    return created
-  })
+  // transaction so all-or-nothing. Ids are minted sequentially off one
+  // MAX(seq) read — a parallel map would hand every row the same seq.
+  // withUniqueRetry re-runs the whole batch if a concurrent insert
+  // stole a seq (P2002). Interactive transactions default to a 5 s
+  // timeout — far too short for a 100-shift import chunk against Neon
+  // (P2028 "Transaction not found"), so raise it explicitly.
+  const rows = await withUniqueRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const base = await nextUserSeq(dbId, owner, 's', tx as any)
+      const ids = payload.map((_, i) => formatUserRowId(owner, 's', base + i))
+      const created = await Promise.all(
+        payload.map((p, i) =>
+          (tx as any).userShift.create({ data: { id: ids[i], ...p } }),
+        ),
+      )
+      return created
+    }, { timeout: 60_000, maxWait: 10_000 }))
 
   revalidatePath('/dashboard')
   return rows.map(mapShift)
+}
+
+/** Delete one shift row by id (must belong to the current user).
+ *  Mirrors updateShiftActuals' ownership check. */
+export async function deleteShiftById(id: string): Promise<{ ok: boolean }> {
+  const userId = await requireUserId()
+  if (!id) throw new Error('id is required')
+  const existing = await prisma.userShift.findUnique({
+    where: { id },
+    select: { userId: true },
+  })
+  if (!existing || existing.userId !== userId) {
+    throw new Error('Shift not found')
+  }
+  await prisma.userShift.delete({ where: { id } })
+  revalidatePath('/dashboard')
+  return { ok: true }
+}
+
+/** Patch a shift's core fields (job, scheduled times, notes) by id. */
+export async function updateShiftFields(input: {
+  shiftId: string
+  jobId?: string
+  start?: string
+  end?: string
+  actualLogin?: string | null
+  actualLogout?: string | null
+  actualBreaks?: import('@/types').Break[] | null
+  workDetails?: string | null
+  templateId?: string | null
+}): Promise<ShiftRow | null> {
+  const userId = await requireUserId()
+  if (!input?.shiftId) throw new Error('shiftId is required')
+
+  const data: Record<string, unknown> = {}
+  if (input.jobId !== undefined) {
+    if (typeof input.jobId !== 'string' || !input.jobId) throw new Error('Invalid jobId')
+    data.jobId = input.jobId
+  }
+  if (input.start !== undefined) {
+    if (!isHHMM(input.start)) throw new Error(`Invalid start: ${input.start}`)
+    data.start = input.start
+  }
+  if (input.end !== undefined) {
+    if (!isHHMM(input.end)) throw new Error(`Invalid end: ${input.end}`)
+    data.end = input.end
+  }
+  if (input.actualLogin !== undefined) {
+    if (input.actualLogin === null || isHHMM(input.actualLogin)) data.actualLogin = input.actualLogin
+    else throw new Error(`Invalid actualLogin: ${input.actualLogin}`)
+  }
+  if (input.actualLogout !== undefined) {
+    if (input.actualLogout === null || isHHMM(input.actualLogout)) data.actualLogout = input.actualLogout
+    else throw new Error(`Invalid actualLogout: ${input.actualLogout}`)
+  }
+  if (input.actualBreaks !== undefined) {
+    data.actualBreaks = input.actualBreaks === null
+      ? Prisma.JsonNull
+      : (Array.isArray(input.actualBreaks)
+          ? (input.actualBreaks as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull)
+  }
+  if (input.workDetails !== undefined) {
+    data.workDetails = typeof input.workDetails === 'string' && input.workDetails.trim()
+      ? input.workDetails.trim()
+      : null
+  }
+  if (input.templateId !== undefined) {
+    data.templateId = input.templateId || null
+  }
+  if (Object.keys(data).length === 0) throw new Error('No fields supplied')
+
+  const existing = await prisma.userShift.findUnique({
+    where: { id: input.shiftId },
+    select: { userId: true },
+  })
+  if (!existing || existing.userId !== userId) {
+    throw new Error('Shift not found')
+  }
+
+  try {
+    const row = await prisma.userShift.update({ where: { id: input.shiftId }, data })
+    revalidatePath('/dashboard')
+    return mapShift(row)
+  } catch (err) {
+    console.error('[updateShiftFields] DB update failed', err)
+    return null
+  }
+}
+
+/** Delete every shift row for the authenticated user (import replace mode).
+ *  Client stores only know months they've synced, so wiping by date keys
+ *  from state leaves DB rows behind — this clears at the source. */
+export async function deleteAllShifts(): Promise<number> {
+  const userId = await requireUserId()
+  const { count } = await prisma.userShift.deleteMany({ where: { userId } })
+  revalidatePath('/dashboard')
+  return count
 }
 
 /** Fetch DB-backed shifts for a single calendar month (year, 1-indexed month). */

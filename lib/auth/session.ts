@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import crypto from 'crypto'
 import { prisma } from './prisma'
 import { SESSION_COOKIE } from './constants'
@@ -40,15 +40,17 @@ export async function createSession(userId: string) {
   })
 
   const cookieStore = await cookies()
-  // Only mark Secure when the request is actually over HTTPS. Mobile devices on
-  // LAN IPs (http://192.168.x.x:3000) need a non-Secure cookie to stay logged
-  // in; HTTPS deployments still get the Secure flag automatically.
-  //
-  // Always `secure` in production. Vercel serves HTTPS at the load
-  // balancer; an HTTP-on-LAN dev session needs the secure flag off so
-  // the cookie sticks. NODE_ENV drives this — not APP_URL — to
-  // decouple the cookie security posture from the canonical app URL.
-  const isHttps = process.env.NODE_ENV === 'production'
+  // Mark Secure only when the request actually arrived over HTTPS,
+  // read from the proxy-forwarded protocol header. Deriving this from
+  // NODE_ENV alone breaks local Docker — a production build served on
+  // plain http://localhost:3000 — where browsers that don't exempt
+  // localhost (Firefox) reject the Secure cookie, the session never
+  // persists, and every subsequent server action fails as
+  // unauthenticated. Vercel and TLS-terminating proxies always send
+  // x-forwarded-proto: https; direct HTTP (local/LAN) doesn't.
+  const hdrs = await headers()
+  const proto = hdrs.get('x-forwarded-proto')?.split(',')[0]?.trim()
+  const isHttps = proto === 'https'
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',

@@ -235,7 +235,9 @@ model UserShift {
   actualLogin  String?  // "HH:MM" — actual clock-in (per-minute pay)
   actualLogout String?  // "HH:MM" — actual clock-out
   actualBreaks Json?    // Break[] serialized
-  templateId  String?  @db.Uuid
+  // User-prefixed template id (`nithesh_tpl1`) — TEXT, not uuid, since
+  // the user-prefixed-ids migration; old uuid values still fit as text.
+  templateId  String?
   source      String   @default("manual") // 'manual' | 'template' | 'apply'
   workDetails String?  // optional free-text note (branches, breaks, etc.)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

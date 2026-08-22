@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/auth/prisma'
 import { getCurrentUser } from '@/lib/auth/session'
-import { makeUserRowId } from '@/lib/ids'
+import { makeUserRowId, parseUserPrefixedId, withUniqueRetry } from '@/lib/ids'
 import { revalidatePath } from 'next/cache'
 
 // ── Types ──────────────────────────────────────────
@@ -96,33 +96,39 @@ export async function createJob(data: JobData): Promise<JobRow> {
     )
   }
 
-  const userRowIdPrefix = handle ? `${handle}_` : null
-
-  // Validate any client-supplied id belongs to this user.
-  if (rawId && userRowIdPrefix && !rawId.startsWith(userRowIdPrefix)) {
-    throw new Error(
-      `Job id "${rawId}" does not belong to your account — a new id will be generated instead.`,
-    )
+  // Validate any client-supplied id belongs to this user AND is
+  // job-shaped — a startsWith(handle + '_') check alone would accept
+  // `nithesh_tpl9` (a template id) as a job id.
+  if (rawId && handle) {
+    const parsed = parseUserPrefixedId(rawId)
+    if (!parsed || parsed.userId !== handle || parsed.prefix !== 'j') {
+      throw new Error(
+        `Job id "${rawId}" does not belong to your account — a new id will be generated instead.`,
+      )
+    }
   }
 
-  // Use handle for the ID prefix (e.g. nithesh_j1). Store UUID as userId FK.
+  // Use handle for the ID prefix (e.g. nithesh_j1). The internal id is the
+  // userId FK — makeUserRowId needs both: the FK value for the seq filter,
+  // the handle for the prefix. Retry on P2002 for concurrent creates.
+  const owner = handle ?? dbId
   const id =
     rawId ||
-    (await prisma.$transaction(async (tx) =>
-      makeUserRowId(handle ?? dbId, 'j', tx as any),
-    ))
+    (await withUniqueRetry(() =>
+      prisma.$transaction(async (tx) => makeUserRowId(dbId, owner, 'j', tx as any))))
 
-  const row = await prisma.userJob.create({
-    data: {
-      id,
-      userId: dbId,
-      name: data.name.trim(),
-      color: data.color,
-      rate: data.rate,
-      nightRate: data.nightRate,
-      sortOrder: data.sortOrder ?? 0,
-    },
-  })
+  const row = await withUniqueRetry(() =>
+    prisma.userJob.create({
+      data: {
+        id,
+        userId: dbId,
+        name: data.name.trim(),
+        color: data.color,
+        rate: data.rate,
+        nightRate: data.nightRate,
+        sortOrder: data.sortOrder ?? 0,
+      },
+    }))
   revalidatePath('/dashboard')
   return mapJob(row)
 }
@@ -192,33 +198,32 @@ export async function deleteJob(id: string): Promise<{ count: number }> {
   return { count }
 }
 
-/** Replace the user's full job list. Used by import. */
+/** Replace the user's full job list. Used by import.
+ *  Supplied ids are always ignored — caller-supplied `otheruser_j5`
+ *  would corrupt the id space or collide; mint fresh user-prefixed
+ *  ids instead, same as createJob. */
 export async function replaceJobs(rows: JobData[]): Promise<JobRow[]> {
   const authUser = await getCurrentUser()
   if (!authUser) throw new Error('Not authenticated')
-  const userId = authUser.id
+  const { id: dbId } = authUser
   if (!Array.isArray(rows)) throw new Error('rows must be an array')
   for (const r of rows) {
     const err = validate(r)
     if (err) throw new Error(err)
   }
-  await prisma.$transaction([
-    prisma.userJob.deleteMany({ where: { userId } }),
-    ...rows.map((r) =>
-      prisma.userJob.create({
-        data: {
-          id: r.id || `import_${Date.now().toString(36)}`,
-          userId,
-          name: r.name.trim(),
-          color: r.color,
-          rate: r.rate,
-          nightRate: r.nightRate,
-          sortOrder: r.sortOrder ?? 0,
-        },
+  await prisma.userJob.deleteMany({ where: { userId: dbId } })
+  const created: JobRow[] = []
+  for (const r of rows) {
+    created.push(
+      await createJob({
+        name: r.name,
+        color: r.color,
+        rate: r.rate,
+        nightRate: r.nightRate,
+        sortOrder: r.sortOrder,
       }),
-    ),
-  ])
+    )
+  }
   revalidatePath('/dashboard')
-  const after = await prisma.userJob.findMany({ where: { userId } })
-  return after.map(mapJob)
+  return created
 }

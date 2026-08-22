@@ -14,7 +14,7 @@ import {
 } from '@/app/actions/templates'
 import {
   createShifts as serverCreateShifts,
-  deleteShiftsByDate as serverDeleteShiftsByDate,
+  deleteAllShifts as serverDeleteAllShifts,
   type NewShiftInput,
 } from '@/app/actions/shifts'
 import {
@@ -22,8 +22,8 @@ import {
   getExpenses,
   createCategory,
   updateCategory,
-  replaceMonthsExpenses,
   createExpensesBulk,
+  deleteAllExpensesAndCategories as serverDeleteAllExpensesAndCategories,
 } from '@/app/actions/expenses'
 import {
   createBudgetGoal,
@@ -91,7 +91,7 @@ function looksLikeDayRow(x: unknown): x is { date: string; shifts: unknown[] } {
     Array.isArray(r.shifts)
 }
 
-function looksLikeShiftRow(x: unknown): x is { jobId: string; start: string; end: string } {
+function looksLikeShiftRow(x: unknown): x is { jobId: string; start: string; end: string; actualLogin?: string; actualLogout?: string } {
   if (!x || typeof x !== 'object') return false
   const r = x as Record<string, unknown>
   return typeof r.jobId === 'string' && r.jobId.length > 0 &&
@@ -113,8 +113,15 @@ function normalizeShiftsShape(raw: Record<string, unknown>): Record<string, unkn
   for (const k of Object.keys(raw ?? {})) {
     const v = raw[k]
     if (Array.isArray(v)) {
+      // Direct date-keyed arrays: only trust keys that are real dates —
+      // anything else (legacy index keys, typos) would flow into the DB
+      // batch and fail the whole chunk.
+      const keyOk = /^\d{4}-\d{2}-\d{2}$/.test(k)
       for (const row of v) {
-        if (looksLikeShiftRow(row)) { (out[k] ??= []).push(row); continue }
+        if (looksLikeShiftRow(row)) {
+          if (keyOk) (out[k] ??= []).push(row)
+          continue
+        }
         if (looksLikeDayRow(row)) {
           (out[row.date] ??= [])
           for (const s of row.shifts ?? []) if (looksLikeShiftRow(s)) out[row.date].push(s)
@@ -135,16 +142,20 @@ function normalizeShiftsShape(raw: Record<string, unknown>): Record<string, unkn
   }
 
   for (const dk of Object.keys(out)) {
-    const seen = new Set<string>()
-    const dedup: unknown[] = []
+    // Dedup by (jobId, start, end). When duplicates collide, keep the
+    // RICHER row: legacy backups often list the same shift twice — once
+    // from an index-shaped entry (no actuals) and once date-keyed with
+    // actual clock times. First-wins would silently drop the actuals.
+    const bySig = new Map<string, unknown>()
     for (const row of out[dk] ?? []) {
       if (!looksLikeShiftRow(row)) continue
       const sig = `${row.jobId}\u0001${row.start}\u0001${row.end}`
-      if (seen.has(sig)) continue
-      seen.add(sig)
-      dedup.push(row)
+      const prev = bySig.get(sig) as { actualLogin?: string; actualLogout?: string } | undefined
+      const richer =
+        !prev || (!prev.actualLogin && !prev.actualLogout && (row.actualLogin || row.actualLogout))
+      if (richer) bySig.set(sig, row)
     }
-    out[dk] = dedup
+    out[dk] = [...bySig.values()]
   }
 
   return out
@@ -283,14 +294,19 @@ export async function importData(
     const existingTemplates = await getTemplates()
     for (const t of existingTemplates) await serverDeleteTemplate(t.id).catch(() => null)
 
-    const shiftsState = useShiftsStore.getState().shifts
-    for (const dk of Object.keys(shiftsState)) await serverDeleteShiftsByDate(dk).catch(() => null)
+    // Wipe shifts at the DB level — the client store may not have synced
+    // every month, so deleting by its date keys would leave rows behind.
+    await serverDeleteAllShifts().catch(() => null)
 
     const existingGoals = await getBudgetGoals()
     for (const g of existingGoals) await deleteBudgetGoal(g.id).catch(() => null)
 
-    const monthKeys = Object.keys(data.expenses ?? {})
-    if (monthKeys.length > 0) await replaceMonthsExpenses(monthKeys).catch(() => null)
+    // Full expenses+categories wipe — replace mode must recreate the
+    // backup's exact category tree. Wiping only the backup's expense
+    // months (old behaviour) left categories accumulating a duplicate
+    // set on every replace import (33 → 66 → 99 …). Expenses go first:
+    // they hold required FKs to categories.
+    await serverDeleteAllExpensesAndCategories().catch(() => null)
   }
 
   // ── jobId remap: strip old IDs, let server mint fresh ones ──────
@@ -351,8 +367,17 @@ export async function importData(
   }
 
   // ── templates ─────────────────────────────────────────────
+  // templateIdMap remaps backup template ids → fresh DB ids so shift
+  // rows never point at stale/foreign ids (spec: no raw-backup-id
+  // fallback, no broken links).
   let templatesInserted = 0
+  const templateIdMap = new Map<string, string>()
   if (Array.isArray(data.templates)) {
+    // Same-user re-import: an existing DB template with the identical id
+    // is still valid — record it so shifts can keep pointing at it.
+    for (const t of await getTemplates()) {
+      templateIdMap.set(t.id, t.id)
+    }
     for (const t of data.templates) {
       const mappedJobId = jobIdMap.get(t.jobId)
       if (!mappedJobId) {
@@ -360,7 +385,7 @@ export async function importData(
         continue
       }
       try {
-        await serverCreateTemplate({
+        const created = await serverCreateTemplate({
           name: t.name,
           days: Array.isArray(t.days) ? t.days : [],
           jobId: mappedJobId,
@@ -368,6 +393,7 @@ export async function importData(
           end: t.end,
           workDetails: (t as any).workDetails ?? null,
         })
+        if (t.id && created?.id) templateIdMap.set(t.id, created.id)
         templatesInserted++
       } catch (err) {
         console.warn('[importData] serverCreateTemplate failed for', t.name, err)
@@ -381,6 +407,7 @@ export async function importData(
   const existingShifts = useShiftsStore.getState().shifts
   const shiftsByDate = (data.shifts ?? {}) as Record<string, unknown[]>
   const shiftInputs: NewShiftInput[] = []
+  const warnedTplIds = new Set<string>()
 
   for (const dk of Object.keys(shiftsByDate)) {
     const day = shiftsByDate[dk] ?? []
@@ -404,6 +431,15 @@ export async function importData(
         if (dup) continue
       }
 
+      const rawTplId = (s as any).templateId as string | undefined
+      if (rawTplId && !templateIdMap.has(rawTplId) && !warnedTplIds.has(rawTplId)) {
+        warnedTplIds.add(rawTplId)
+        warnings.push(
+          `Shift on ${dk} references templateId "${rawTplId}" that was not imported — ` +
+          `the link was dropped (shift kept).`
+        )
+      }
+
       shiftInputs.push({
         date: dk,
         jobId: mappedJobId,
@@ -413,18 +449,26 @@ export async function importData(
         actualLogout: (s as any).actualLogout ?? null,
         actualBreaks: (s as any).actualBreaks ?? null,
         workDetails: (s as any).workDetails ?? null,
-        templateId: (s as any).templateId ?? undefined,
+        // Remap through templateIdMap; unmapped ids are dropped with a
+        // warning rather than written raw (would be a broken link).
+        templateId: rawTplId ? templateIdMap.get(rawTplId) : undefined,
         source: (s as any).source ?? undefined,
       })
     }
   }
 
+  let shiftsInserted = 0
   if (shiftInputs.length > 0) {
     const chunkSize = 100
     for (let i = 0; i < shiftInputs.length; i += chunkSize) {
+      const chunk = shiftInputs.slice(i, i + chunkSize)
       try {
-        await serverCreateShifts({ shifts: shiftInputs.slice(i, i + chunkSize) })
+        const created = await serverCreateShifts({ shifts: chunk })
+        shiftsInserted += created?.length ?? chunk.length
       } catch (err) {
+        // A failed chunk is user-visible: every shift in it was lost.
+        const days = [...new Set(chunk.map((c) => c.date))].join(', ')
+        failures.push(`shifts on ${days}: ${(err as Error)?.message ?? 'insert failed'}`)
         console.warn('[importData] serverCreateShifts chunk failed', err)
       }
     }
@@ -523,7 +567,9 @@ export async function importData(
     for (const g of data.goals) {
       try {
         await createBudgetGoal({
-          id: (g as any).id,
+          // id deliberately NOT forwarded: goal ids are globally unique
+          // Date.now() numerics — a foreign backup id would P2002 on the
+          // real owner's row. The server mints a fresh one.
           name: (g as any).name,
           deadline: (g as any).deadline,
           target: (g as any).target,
@@ -558,7 +604,7 @@ export async function importData(
   return {
     jobs: jobsInserted,
     templates: templatesInserted,
-    shifts: Object.keys(shiftsByDate).length,
+    shifts: shiftsInserted,
     categories: categoriesInserted,
     expenses: expensesInserted,
     goals: goalsInserted,

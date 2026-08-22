@@ -214,6 +214,20 @@ export async function deleteCategory(id: string): Promise<boolean> {
   return true
 }
 
+/** Wipe ALL expenses + categories for the authenticated user (import
+ *  replace mode). Expenses must be deleted first — they hold required
+ *  FKs to categories. A single deleteMany per table also satisfies the
+ *  categories' self-referencing parent FK. */
+export async function deleteAllExpensesAndCategories(): Promise<{ expenses: number; categories: number }> {
+  const userId = await getUserId()
+  const [exp, cat] = await prisma.$transaction([
+    prisma.expense.deleteMany({ where: { userId } }),
+    prisma.expenseCategory.deleteMany({ where: { userId } }),
+  ])
+  revalidatePath('/dashboard')
+  return { expenses: exp.count, categories: cat.count }
+}
+
 // ── Expense CRUD ───────────────────────────────────
 export async function getExpenses(monthKey: string): Promise<ExpenseData[]> {
   const userId = await getUserId()

@@ -85,7 +85,7 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         nightRate: job.nightRate,
       })
       set((s) => ({
-        jobs: s.jobs.map((j) => (j.id === tempId ? created : j)),
+        jobs: s.jobs.map((j) => (j.id === tempId ? rowToJob(created) : j)),
       }))
     } catch (err) {
       console.error('[useJobsStore.addJob] DB write failed', err)

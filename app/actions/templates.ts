@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/auth/prisma'
 import { getCurrentUser } from '@/lib/auth/session'
-import { makeUserRowId } from '@/lib/ids'
+import { makeUserRowId, withUniqueRetry } from '@/lib/ids'
 import { revalidatePath } from 'next/cache'
 
 // ── Types ──────────────────────────────────────────
@@ -63,16 +63,21 @@ export async function getTemplates(): Promise<TemplateRow[]> {
 }
 
 export async function createTemplate(data: TemplateData): Promise<TemplateRow> {
-  const userId = await requireUserId()
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+  const userId = user.id
+  const owner = user.userId ?? user.id
   // Normalize workDetails: trim and treat empties as null so the DB stays clean.
   const wd =
     typeof data.workDetails === 'string' && data.workDetails.trim().length > 0
       ? data.workDetails.trim()
       : null
-  // Generate user-prefixed id inside a transaction.
-  const id = await prisma.$transaction(async (tx) =>
-    makeUserRowId(userId, 'tpl', tx as any),
-  )
+  // Generate user-prefixed id (handle prefix, internal id as FK filter),
+  // retrying on P2002 for concurrent creates.
+  const id = await withUniqueRetry(() =>
+    prisma.$transaction(async (tx) =>
+      makeUserRowId(userId, owner, 'tpl', tx as any),
+    ))
   const row = await prisma.userTemplate.create({
     data: {
       id,

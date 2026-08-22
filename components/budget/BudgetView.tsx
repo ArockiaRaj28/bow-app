@@ -31,12 +31,18 @@ export default function BudgetView() {
   const storedExpenses = useExpensesStore(s => s.expensesByMonth[currentMonth])
   const loadedMonths = useExpensesStore(s => s.loadedMonths)
   const loadExpenses = useExpensesStore(s => s.loadMonth)
+  const dbCategories = useExpensesStore(s => s.categories)
+  const loadCategories = useExpensesStore(s => s.loadCategories)
   useEffect(() => {
+    // Categories are normally loaded by the Expenses tab; when the user
+    // lands on Budget first they'd be missing (expenses get dropped in
+    // the merge below), so ensure them here too — loadCategories dedupes.
+    void loadCategories()
     void loadExpenses(currentMonth)
-  }, [currentMonth, loadExpenses, loadedMonths])
+  }, [currentMonth, loadExpenses, loadedMonths, loadCategories])
 
   const mergedData = useMemo(() => {
-    const dbCats = useExpensesStore.getState().categories
+    const dbCats = dbCategories
     const dbExps = storedExpenses ?? []
     const existingMonth = budgets[currentMonth] || {}
 
@@ -98,7 +104,7 @@ export default function BudgetView() {
       })
 
     return { mergedCats, mappedExps, existingMonth }
-  }, [storedExpenses, currentMonth])
+  }, [storedExpenses, currentMonth, dbCategories])
 
   const month = budgets[currentMonth]
 

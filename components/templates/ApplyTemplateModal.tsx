@@ -40,7 +40,7 @@ function fmtShort(dk: string): string {
 export default function ApplyTemplateModal() {
   const { closeModal, modalDateKey: tmplId } = useAppStore()
   const { templates, fetchTemplatesFromDB, apiReady } = useTemplatesStore()
-  const { shifts } = useShiftsStore()
+  const { shifts, addShiftsToDB, syncShiftsFromDB } = useShiftsStore()
   const { jobs } = useJobsStore()
 
   // Ensure templates are loaded (modal can open before the Templates tab is visited)
@@ -57,6 +57,7 @@ export default function ApplyTemplateModal() {
   const [pickerDate, setPickerDate] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const today = todayKey()
   const tomorrow = useMemo(() => addDays(today, 1), [today])
@@ -121,12 +122,29 @@ export default function ApplyTemplateModal() {
   const canSave = !!template && selectedDates.length > 0 && !saving
 
   const handleSave = async () => {
-    if (!canSave) return
+    if (!canSave || !template) return
     setSaving(true)
-    // ═══ TODO: wire persistence here (localStorage or DB) ═══
-    console.log('[ApplyTemplateModal] save pending — template:', template?.id, 'dates:', selectedDates)
-    await new Promise(r => setTimeout(r, 300)) // simulate save UX
-    closeModal()
+    setErrorMsg(null)
+    try {
+      await addShiftsToDB(
+        selectedDates.map(dk => ({
+          date: dk,
+          jobId: template.jobId,
+          start: template.start,
+          end: template.end,
+          templateId: template.id,
+          source: 'template' as const,
+          workDetails: template.workDetails ?? null,
+        }))
+      )
+      // Pull fresh data so calendar/Insights reflect the applied shifts
+      await syncShiftsFromDB()
+      closeModal()
+    } catch (err: unknown) {
+      const e = err as { message?: string }
+      setErrorMsg(e?.message || 'Failed to apply template. Please try again.')
+      setSaving(false)
+    }
   }
 
   return (
@@ -312,6 +330,15 @@ export default function ApplyTemplateModal() {
           borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--red, #f87171)',
         }}>
           Template not found. It may have been deleted.
+        </div>
+      )}
+
+      {errorMsg && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)',
+          borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--red, #f87171)',
+        }}>
+          {errorMsg}
         </div>
       )}
     </Modal>

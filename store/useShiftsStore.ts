@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Shift, ShiftsStore, Break } from '@/types'
 import { recalculateDayTotals } from '@/lib/nightPayEngine'
-import { createShifts, getAllShifts, updateShiftActuals, type NewShiftInput, type ShiftRow } from '@/app/actions/shifts'
+import { createShifts, deleteShiftById, getAllShifts, updateShiftActuals, updateShiftFields, type NewShiftInput, type ShiftRow } from '@/app/actions/shifts'
 
 /**
  * Hour totals per (date, job) — derived from the canonical `shifts` map
@@ -24,8 +24,14 @@ interface ShiftsState {
    *  Resolves once the row is persisted (callers don't need to await — the
    *  local state is updated first). */
   addShift: (dateKey: string, shift: Shift) => Promise<void>
-  updateShift: (dateKey: string, index: number, shift: Shift) => void
-  deleteShift: (dateKey: string, index: number) => void
+  /** Replace a shift's fields. Optimistic locally; persisted when the
+   *  row has a server `_id` (rows without one were never flushed — the
+   *  next addShift/updateActualTimes carries them upstream). */
+  updateShift: (dateKey: string, index: number, shift: Shift) => Promise<void>
+  /** Remove a shift. Optimistic locally; the DB row is deleted when the
+   *  entry has a server `_id` — otherwise it would resurrect on the next
+   *  syncShiftsFromDB. */
+  deleteShift: (dateKey: string, index: number) => Promise<void>
   /** Patch actual-times on an existing shift. Updates the local store
    *  optimistically; if the shift was loaded from the DB (`_id` present) the
    *  update is also sent to the server via `updateShiftActuals`. */
@@ -122,9 +128,11 @@ export const useShiftsStore = create<ShiftsState>()(
         }
       },
 
-      updateShift: (dk, index, shift) => {
+      updateShift: async (dk, index, shift) => {
+        let rowId: string | undefined
         set((s) => {
           const day = [...(s.shifts[dk] || [])]
+          rowId = day[index]?._id
           day[index] = shift
           const nextShifts = { ...s.shifts, [dk]: day }
           return {
@@ -132,10 +140,27 @@ export const useShiftsStore = create<ShiftsState>()(
             dayTotals: withRefreshedDay(s.dayTotals, dk, day),
           }
         })
+
+        if (!rowId) return
+        try {
+          await updateShiftFields({
+            shiftId: rowId,
+            jobId: shift.jobId,
+            start: shift.start,
+            end: shift.end,
+            actualLogin: shift.actualLogin ?? null,
+            actualLogout: shift.actualLogout ?? null,
+            actualBreaks: shift.actualBreaks ?? null,
+          })
+        } catch (err) {
+          console.error('[useShiftsStore.updateShift] DB update failed', err)
+        }
       },
 
-      deleteShift: (dk, index) => {
+      deleteShift: async (dk, index) => {
+        let rowId: string | undefined
         set((s) => {
+          rowId = (s.shifts[dk] || [])[index]?._id
           const day = (s.shifts[dk] || []).filter((_, i) => i !== index)
           const nextShifts = { ...s.shifts }
           if (day.length === 0) delete nextShifts[dk]
@@ -145,6 +170,13 @@ export const useShiftsStore = create<ShiftsState>()(
             dayTotals: withRefreshedDay(s.dayTotals, dk, day),
           }
         })
+
+        if (!rowId) return
+        try {
+          await deleteShiftById(rowId)
+        } catch (err) {
+          console.error('[useShiftsStore.deleteShift] DB delete failed', err)
+        }
       },
 
       updateActualTimes: async (dk, index, login, logout, breaks) => {
