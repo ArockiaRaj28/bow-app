@@ -30,16 +30,26 @@ export default function Topbar() {
       display: 'flex', alignItems: 'center', gap: 10,
     }}>
       {/* Brand */}
-      <div style={{ minWidth: 0, marginRight: 'auto' }}>
-        <div style={{
-          fontSize: 15, fontWeight: 800, letterSpacing: -0.3,
-          whiteSpace: 'nowrap',
-          fontFamily: 'var(--display, inherit)',
-        }}>
-          🇯🇵 BOW
-        </div>
-        <div style={{ fontSize: 9.5, color: 'var(--muted)', letterSpacing: '0.04em', marginTop: 1 }}>
-          WORK · CALENDAR
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginRight: 'auto', minWidth: 0 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo.png"
+          alt="BOW logo"
+          width={30}
+          height={30}
+          style={{ borderRadius: 8, flexShrink: 0, boxShadow: '0 2px 10px rgba(59,130,246,0.35)' }}
+        />
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontSize: 15, fontWeight: 800, letterSpacing: -0.3,
+            whiteSpace: 'nowrap',
+            fontFamily: 'var(--display, inherit)',
+          }}>
+            BOW
+          </div>
+          <div style={{ fontSize: 9.5, color: 'var(--muted)', letterSpacing: '0.04em', marginTop: 1 }}>
+            WORK · CALENDAR
+          </div>
         </div>
       </div>
 
