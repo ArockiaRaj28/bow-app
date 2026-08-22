@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import BrandLoader from '@/components/layout/BrandLoader'
 import { saveCategoryBudgetByName } from '@/app/actions/expenses'
 import { getDayHours, getNightHours } from '@/lib/dayHours'
 import { dateKey } from '@/lib/dateUtils'
@@ -139,7 +140,7 @@ export default function BudgetView() {
   // goal card and headline still render because `month.goals`/`notes`
   // come from the store.
   if (!month) {
-    return <div style={{ padding: 16, color: 'var(--muted)' }}>Loading…</div>
+    return <BrandLoader compact label="Loading budget" />
   }
 
   const { year, month: m } = parseMonthKey(currentMonth)
