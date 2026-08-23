@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import BrandLoader from '@/components/layout/BrandLoader'
 import { useTemplatesStore } from '@/store/useTemplatesStore'
 import { useAppStore } from '@/store/useAppStore'
 import TemplateCard from './TemplateCard'
 import { useJobsStore } from '@/store/useJobsStore'
 
 export default function TemplatesView() {
-  const { templates, fetchTemplatesFromDB } = useTemplatesStore()
+  const { templates, templatesLoading, fetchTemplatesFromDB } = useTemplatesStore()
   const { jobs } = useJobsStore()
   const { setModal } = useAppStore()
 
@@ -29,7 +30,9 @@ export default function TemplatesView() {
         Templates let you quickly apply recurring shift patterns across multiple weeks.
       </p>
 
-      {templates.length === 0 ? (
+      {templatesLoading && templates.length === 0 ? (
+        <BrandLoader compact label="Loading templates" />
+      ) : templates.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--muted)' }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🔁</div>
           <div style={{ fontSize: 14 }}>No templates yet</div>

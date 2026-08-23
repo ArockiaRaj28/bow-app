@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
+import BrandLoader from '@/components/layout/BrandLoader'
 import type { ExpenseData } from '@/app/actions/expenses'
 import { formatYen } from '@/lib/timeUtils'
 
@@ -28,11 +29,7 @@ export default function ExpenseList({ expenses, onDeleted, onEdit, onDeleteClick
   const totalSpent = expenses.reduce((s, e) => s + e.amount, 0)
 
   if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: 13 }}>
-        Loading expenses…
-      </div>
-    )
+    return <BrandLoader compact label="Loading expenses" />
   }
 
   if (expenses.length === 0) {

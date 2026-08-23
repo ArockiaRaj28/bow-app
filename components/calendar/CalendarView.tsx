@@ -1,6 +1,7 @@
 'use client'
 
 import { useAppStore } from '@/store/useAppStore'
+import BrandLoader from '@/components/layout/BrandLoader'
 import { useJobsStore } from '@/store/useJobsStore'
 import { useShiftsStore } from '@/store/useShiftsStore'
 import JobLegend from './JobLegend'
@@ -11,8 +12,14 @@ import { DAY_NAMES_SHORT } from '@/lib/constants'
 
 export default function CalendarView() {
   const { curY, curM } = useAppStore()
-  const { jobs } = useJobsStore()
+  const { jobs, jobsLoading } = useJobsStore()
   const { shifts } = useShiftsStore()
+
+  // First boot: jobs still hydrating and nothing cached to paint yet —
+  // show the branded loader instead of a bare, jobless calendar.
+  if (jobsLoading && jobs.length === 0) {
+    return <BrandLoader compact label="Loading calendar" />
+  }
 
   return (
     <div style={{ padding: '12px 12px 0' }}>
