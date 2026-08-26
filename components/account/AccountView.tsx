@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useTransition } from 'react'
 import Link from 'next/link'
-import { Settings } from 'lucide-react'
+import { Settings, Shield, ArrowRight } from 'lucide-react'
 import { AuthUser } from '@/lib/auth/session'
 import { updateAccount, resendVerificationEmailAction } from '@/app/actions/account'
 import { logoutAction } from '@/app/auth/actions'
@@ -123,12 +123,24 @@ export default function AccountView({ user }: { user: AuthUser }) {
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h2 style={{
-            fontSize: 16, fontWeight: 800, fontFamily: 'var(--display)',
-            margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {user.name}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <h2 style={{
+              fontSize: 16, fontWeight: 800, fontFamily: 'var(--display)',
+              margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {user.name}
+            </h2>
+            {user.role === 'ADMIN' && (
+              <span style={{
+                fontSize: 9.5, fontWeight: 800, letterSpacing: '0.04em',
+                padding: '2px 7px', borderRadius: 999,
+                background: 'rgba(99,102,241,0.2)', color: '#a5b4fc',
+                border: '1px solid rgba(99,102,241,0.4)',
+              }}>
+                ADMIN
+              </span>
+            )}
+          </div>
           <p style={{ fontSize: 12, color: 'var(--muted)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {user.email}
           </p>
@@ -144,6 +156,49 @@ export default function AccountView({ user }: { user: AuthUser }) {
           </div>
         </div>
       </div>
+
+      {/* ── Admin Dashboard Quick Redirect (Admin only) ── */}
+      {user.role === 'ADMIN' && (
+        <div style={{ margin: '0 16px 14px' }}>
+          <Link
+            href="/admin"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '13px 16px',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.16) 0%, rgba(59,130,246,0.14) 100%)',
+              border: '1px solid rgba(99,102,241,0.38)',
+              borderRadius: 14,
+              textDecoration: 'none',
+              color: 'var(--text)',
+              transition: 'all 0.15s ease',
+              boxShadow: '0 2px 12px rgba(99,102,241,0.15)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: 'rgba(99,102,241,0.24)',
+                border: '1px solid rgba(99,102,241,0.45)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#a5b4fc',
+              }}>
+                <Shield size={19} strokeWidth={2.3} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', fontFamily: 'var(--display)' }}>
+                  Admin Dashboard
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>
+                  Users, analytics, audit logs, emails &amp; system status
+                </div>
+              </div>
+            </div>
+            <ArrowRight size={16} color="#a5b4fc" />
+          </Link>
+        </div>
+      )}
 
       {/* ── Verification Banner (unverified only) ── */}
       {!isVerified && (
@@ -321,7 +376,7 @@ export default function AccountView({ user }: { user: AuthUser }) {
             <Settings size={14} strokeWidth={2.4} />
             <span>Settings · Backup · Import / Export</span>
           </div>
-          <SettingsView />
+          <SettingsView user={user} />
         </div>
 
       {/* ── Sign out — lives here, not in the top bar ── */}

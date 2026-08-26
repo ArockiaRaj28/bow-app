@@ -1,11 +1,12 @@
-'use client'
-
+import Link from 'next/link'
+import { Shield, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store/useAppStore'
 import ToggleSwitch from '@/components/ui/ToggleSwitch'
 import BackupPanel from './BackupPanel'
+import type { AuthUser } from '@/lib/auth/session'
 
-export default function SettingsView() {
+export default function SettingsView({ user }: { user?: AuthUser }) {
   const { perMinutePay, setPerMinutePay } = useAppStore()
 
   const handleToggle = async (next: boolean) => {
@@ -19,6 +20,50 @@ export default function SettingsView() {
 
   return (
     <div style={{ padding: 16 }}>
+      {/* Admin Panel Redirect (when logged in as ADMIN) */}
+      {user?.role === 'ADMIN' && (
+        <section style={{
+          ...sectionStyle,
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.14) 0%, rgba(59,130,246,0.12) 100%)',
+          border: '1px solid rgba(99,102,241,0.36)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
+                <Shield size={16} color="#a5b4fc" />
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', fontFamily: 'var(--display)' }}>
+                  Admin Dashboard
+                </span>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 999,
+                  background: 'rgba(99,102,241,0.25)', color: '#a5b4fc',
+                  border: '1px solid rgba(99,102,241,0.4)',
+                }}>
+                  ADMIN
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                Access user administration, analytics, audit logs, and system settings
+              </div>
+            </div>
+            <Link
+              href="/admin"
+              style={{
+                padding: '8px 14px', borderRadius: 8,
+                background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+                color: '#fff', fontWeight: 700, fontSize: 12,
+                textDecoration: 'none', whiteSpace: 'nowrap',
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 10px rgba(99,102,241,0.35)',
+                flexShrink: 0,
+              }}
+            >
+              Open Admin <ArrowRight size={13} />
+            </Link>
+          </div>
+        </section>
+      )}
+
       {/* Per-minute toggle */}
       <section style={sectionStyle}>
         <div style={sectionTitle}>Earnings Calculation</div>

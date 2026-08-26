@@ -16,6 +16,7 @@ export default async function AdminOverviewPage() {
   await requireAdmin()
 
   const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
   const [
@@ -23,6 +24,7 @@ export default async function AdminOverviewPage() {
     verifiedUsers,
     adminUsers,
     newLast7d,
+    newToday,
     totalJobs,
     totalShifts,
     totalExpenses,
@@ -32,6 +34,7 @@ export default async function AdminOverviewPage() {
     prisma.user.count({ where: { emailVerified: { not: null } } }),
     prisma.user.count({ where: { role: 'ADMIN' } }),
     prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+    prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
     prisma.userJob.count(),
     prisma.userShift.count(),
     prisma.expense.count(),
@@ -56,6 +59,7 @@ export default async function AdminOverviewPage() {
           <Card label="Unverified" value={unverifiedUsers} accent={unverifiedUsers > 0 ? 'amber' : undefined} />
           <Card label="Admins" value={adminUsers} accent="indigo" />
           <Card label="New (7d)" value={newLast7d} />
+          <Card label="New today" value={newToday} />
         </CardGrid>
       </Section>
 

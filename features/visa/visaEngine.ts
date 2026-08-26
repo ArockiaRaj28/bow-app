@@ -50,6 +50,72 @@ export function wouldBreachLimit(addHours: number, jobs: Job[]): boolean {
   return (total + addHours) > CONFIG.WEEKLY_HOUR_LIMIT
 }
 
+// ── Smart visa guard: prospective week projections ────────────────
+
+export interface PendingShiftInput {
+  date: string    // "YYYY-MM-DD" (local calendar date)
+  jobId: string
+  start: string   // "HH:MM"
+  end: string     // "HH:MM"
+}
+
+export interface WeekProjection {
+  weekStart: Date            // Monday 00:00 local
+  currentHours: number       // hours already on the calendar that week
+  addedHours: number         // hours the pending shifts would add
+  projectedHours: number     // current + added
+  status: VisaStatus         // status of the PROJECTED total
+}
+
+function hhmmToHours(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number)
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0
+  let dur = h + m / 60
+  if (dur <= 0) dur += 24 // overnight shift ending at/before 00:00
+  return dur
+}
+
+/** Pending-shift duration in hours (scheduled times; breaks not known
+ *  at guard time — consistent with how templates/quick-add schedule). */
+export function pendingShiftHours(s: PendingShiftInput): number {
+  return hhmmToHours(s.end) - hhmmToHours(s.start) || 0
+}
+
+/**
+ * Project every week touched by the pending shifts: what it totals now,
+ * what the pending shifts add, and the resulting visa status. Reads
+ * existing hours through the same `getDayHours` bridge the VisaBar
+ * uses, so the guard and the bar can never disagree.
+ */
+export function projectWeeksForShifts(
+  pending: PendingShiftInput[],
+  jobs: Job[],
+): WeekProjection[] {
+  const byWeek = new Map<string, { weekStart: Date; added: number }>()
+
+  for (const s of pending) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.date)
+    if (!m) continue
+    const [, y, mo, d] = m
+    const ws = getWeekStart(new Date(Number(y), Number(mo) - 1, Number(d)))
+    const key = dateKey(ws.getFullYear(), ws.getMonth(), ws.getDate())
+    const entry = byWeek.get(key) ?? { weekStart: ws, added: 0 }
+    entry.added += pendingShiftHours(s)
+    byWeek.set(key, entry)
+  }
+
+  const out: WeekProjection[] = []
+  for (const { weekStart, added } of byWeek.values()) {
+    const currentHours = getWeekHours(weekStart, jobs)
+    const projectedHours = currentHours + added
+    let status: VisaStatus = 'safe'
+    if (projectedHours > CONFIG.WEEKLY_HOUR_LIMIT) status = 'over'
+    else if (projectedHours >= CONFIG.WEEK_NEAR_THRESHOLD) status = 'near'
+    out.push({ weekStart, currentHours, addedHours: added, projectedHours, status })
+  }
+  return out.sort((a, b) => a.weekStart.getTime() - b.weekStart.getTime())
+}
+
 /** Get visa status label and color */
 export function getVisaStatusDisplay(status: VisaStatus) {
   return {

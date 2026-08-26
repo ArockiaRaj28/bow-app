@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import type { Job } from '@/types'
 import { weekDays, dateKey } from '@/lib/dateUtils'
 import { getDayHours, getNightHours } from '@/lib/dayHours'
+import { mutedChipBg, mutedText } from '@/lib/colorUtils'
 import { formatHours, formatYen } from '@/lib/timeUtils'
 import { CONFIG } from '@/lib/constants'
 import ProgressBar from '@/components/ui/ProgressBar'
@@ -56,14 +57,14 @@ export default function WeekSummaryRow({ weekStart, jobs }: Props) {
         <span style={{ fontSize: 10, fontWeight: 700, color: barColor }}>
           {formatHours(stats.hours)}/{limit}h
         </span>
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--green2)' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#34d399' }}>
           {formatYen(stats.earned)}
         </span>
         <div style={{ display: 'flex', gap: 3 }}>
           {stats.jobsWorked.map(j => (
             <span key={j.id} style={{
-              fontSize: 8, background: `${j.color}33`,
-              color: j.color, padding: '1px 4px', borderRadius: 3, fontWeight: 700,
+              fontSize: 8, background: mutedChipBg(j.color),
+              color: mutedText(j.color), padding: '1px 4px', borderRadius: 3, fontWeight: 700,
             }}>{j.name.substring(0, 3)}</span>
           ))}
         </div>

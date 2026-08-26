@@ -46,8 +46,9 @@ export default function MonthSummary({ curY, curM, jobs }: Props) {
       {cells.map((c) => (
         <div key={c.label} style={{
           background: 'var(--card)', borderRadius: 8, padding: '8px 6px', textAlign: 'center',
+          border: '1px solid var(--border)',
         }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>{c.value}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#a5b4fc' }}>{c.value}</div>
           <div style={{ fontSize: 9, color: 'var(--muted)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{c.label}</div>
         </div>
       ))}

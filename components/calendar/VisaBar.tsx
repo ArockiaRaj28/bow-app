@@ -28,7 +28,7 @@ export default function VisaBar({ curY, curM, jobs }: Props) {
   const isOver = weekHours > limit
   const isNear = weekHours >= CONFIG.WEEK_NEAR_THRESHOLD && !isOver
 
-  const barColor = isOver ? 'var(--red)' : isNear ? 'var(--yellow)' : 'var(--green)'
+  const barColor = isOver ? '#f87171' : isNear ? '#fbbf24' : '#34d399'
 
   return (
     <div style={{

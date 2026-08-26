@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, LineChart, Users, Mail, MessageSquare, ScrollText,
+  LayoutDashboard, LineChart, Users, Mail, MessageSquare, ScrollText, Settings
 } from 'lucide-react'
 
 const LINKS = [
@@ -13,6 +13,7 @@ const LINKS = [
   { href: '/admin/emails',    label: 'Emails',    Icon: Mail },
   { href: '/admin/feedback',  label: 'Feedback',  Icon: MessageSquare },
   { href: '/admin/audit-log', label: 'Audit Log', Icon: ScrollText },
+  { href: '/admin/settings',  label: 'Settings',  Icon: Settings },
 ]
 
 /** Pill-style admin nav — mirrors the main app's TopTabs look.

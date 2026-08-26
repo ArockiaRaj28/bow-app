@@ -40,8 +40,8 @@ export default function SupportActionsPanel({
         if (res.success) {
           toast.success(
             key === 'resend' ? 'Verification email resent.'
-            : key === 'logout' ? `Force-logged out. ${'revokedCount' in res && res.revokedCount != null ? `(${res.revokedCount} session${res.revokedCount === 1 ? '' : 's'} revoked)` : ''}`
-            : `Role updated to ${targetRole === 'ADMIN' ? 'USER' : 'ADMIN'}.`
+              : key === 'logout' ? `Force-logged out. ${'revokedCount' in res && res.revokedCount != null ? `(${res.revokedCount} session${res.revokedCount === 1 ? '' : 's'} revoked)` : ''}`
+              : `Role updated to ${targetRole === 'ADMIN' ? 'USER' : 'ADMIN'}.`
           )
         } else {
           toast.error(res.error || 'Action failed.')
@@ -98,7 +98,7 @@ function ActionButton({
 }: {
   label: string
   loading?: boolean
-  tone: 'primary' | 'danger'
+  tone: keyof typeof TONES
   disabled?: boolean
   hint?: string
   onClick: () => void
@@ -145,5 +145,20 @@ const TONES = {
     bg: 'rgba(239,68,68,0.16)',
     fg: '#fca5a5',
     ring: 'rgba(239,68,68,0.35)',
+  },
+  warning: {
+    bg: 'rgba(245,158,11,0.16)',
+    fg: '#fbbf24',
+    ring: 'rgba(245,158,11,0.35)',
+  },
+  secondary: {
+    bg: 'rgba(16,185,129,0.16)',
+    fg: '#34d399',
+    ring: 'rgba(16,185,129,0.35)',
+  },
+  info: {
+    bg: 'rgba(59,130,246,0.16)',
+    fg: '#60a5fa',
+    ring: 'rgba(59,130,246,0.35)',
   },
 } as const

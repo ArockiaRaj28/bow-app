@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import type { Shift, Job, Break } from '@/types'
 import { calcShiftHours, calcShiftEarned } from '@/lib/nightPayEngine'
 import { formatHours, formatYen } from '@/lib/timeUtils'
+import { mutedBar, mutedText } from '@/lib/colorUtils'
 import { useAppStore } from '@/store/useAppStore'
 
 interface Props {
@@ -37,14 +38,14 @@ export default function DayShiftsList({ shifts, jobs, onDelete, onUpdateActual }
 
         return (
           <div key={i} style={{
-            borderLeft: `3px solid ${job.color}`,
+            borderLeft: `3px solid ${mutedBar(job.color)}`,
             background: 'var(--card)',
             borderRadius: '0 8px 8px 0',
             padding: '8px 10px', marginBottom: 6,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: job.color }}>{job.name}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: mutedText(job.color) }}>{job.name}</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>
                   {s.start} – {s.end}
                   {hasActual && (

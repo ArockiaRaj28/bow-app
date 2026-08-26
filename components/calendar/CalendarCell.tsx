@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { useShiftsStore } from '@/store/useShiftsStore'
 import { dateKey, getWeekStart } from '@/lib/dateUtils'
 import { getDayHours, getNightHours } from '@/lib/dayHours'
+import { mutedBar, mutedChipBg, mutedText } from '@/lib/colorUtils'
 import { formatHours, formatYen } from '@/lib/timeUtils'
 import { CONFIG } from '@/lib/constants'
 
@@ -65,9 +66,9 @@ export default function CalendarCell({ day, isToday, isOrientation, jobs, shifts
       onClick={handleClick}
       style={{
         minHeight: 64,
-        border: `1px solid ${isToday ? 'var(--accent)' : isOverLimit && totalHours > 0 ? 'var(--red)' : 'var(--border)'}`,
+        border: `1px solid ${isToday ? 'rgba(99,102,241,0.5)' : isOverLimit && totalHours > 0 ? 'rgba(239,68,68,0.5)' : 'var(--border)'}`,
         borderRadius: 8,
-        background: isToday ? 'rgba(59,130,246,0.08)' : isOrientation ? 'rgba(245,158,11,0.1)' : 'var(--card)',
+        background: isToday ? 'rgba(99,102,241,0.06)' : isOrientation ? 'rgba(245,158,11,0.07)' : 'var(--card)',
         padding: '5px 4px',
         cursor: isOrientation ? 'default' : 'pointer',
         opacity: isOtherMonth ? 0.35 : 1,
@@ -82,7 +83,7 @@ export default function CalendarCell({ day, isToday, isOrientation, jobs, shifts
       {jobHours.length > 0 && (
         <div style={{ display: 'flex', height: 2, borderRadius: 1, overflow: 'hidden', gap: 1 }}>
           {jobHours.map(jh => (
-            <div key={jh.job.id} style={{ flex: jh.total, background: jh.job.color }} />
+            <div key={jh.job.id} style={{ flex: jh.total, background: mutedBar(jh.job.color) }} />
           ))}
         </div>
       )}
@@ -91,17 +92,17 @@ export default function CalendarCell({ day, isToday, isOrientation, jobs, shifts
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{
           fontSize: 11, fontWeight: isToday ? 800 : 600,
-          color: isToday ? 'var(--accent2)' : 'var(--text)',
+          color: isToday ? '#a5b4fc' : 'var(--text)',
         }}>
           {day.getDate()}
         </span>
-        <div style={{ display: 'flex', gap: 2 }}>
-          {isToday && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent2)' }} />}
-          {hasShifts && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--green)' }} />}
+        <div style={{ display: 'flex', gap: 2.5, alignItems: 'center' }}>
+          {isToday && <span style={{ width: 4.5, height: 4.5, borderRadius: '50%', background: '#a5b4fc' }} />}
+          {hasShifts && <span style={{ width: 4.5, height: 4.5, borderRadius: '50%', background: '#34d399' }} />}
           {hasActuals && (
             <span
               title="Per-minute actuals logged"
-              style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--info)' }}
+              style={{ width: 4.5, height: 4.5, borderRadius: '50%', background: '#38bdf8' }}
             />
           )}
         </div>
@@ -109,16 +110,16 @@ export default function CalendarCell({ day, isToday, isOrientation, jobs, shifts
 
       {/* Orientation label */}
       {isOrientation && (
-        <div style={{ fontSize: 8, color: 'var(--yellow)', fontWeight: 700 }}>Orientation</div>
+        <div style={{ fontSize: 8, color: '#fbbf24', fontWeight: 700 }}>Orientation</div>
       )}
 
       {/* Job segments */}
       {jobHours.map(jh => (
         <div key={jh.job.id} style={{
-          fontSize: 9, background: `${jh.job.color}22`,
-          borderLeft: `2px solid ${jh.job.color}`,
+          fontSize: 9, background: mutedChipBg(jh.job.color),
+          borderLeft: `2px solid ${mutedBar(jh.job.color)}`,
           padding: '1px 3px', borderRadius: '0 3px 3px 0',
-          color: jh.job.color, fontWeight: 700,
+          color: mutedText(jh.job.color), fontWeight: 700,
         }}>
           {jh.job.name.substring(0, 4)} {formatHours(jh.total)}
         </div>
@@ -126,7 +127,7 @@ export default function CalendarCell({ day, isToday, isOrientation, jobs, shifts
 
       {/* Earnings */}
       {totalHours > 0 && (
-        <div style={{ fontSize: 9, color: 'var(--green2)', fontWeight: 700, marginTop: 1 }}>
+        <div style={{ fontSize: 9, color: '#34d399', fontWeight: 700, marginTop: 1, opacity: 0.9 }}>
           {formatYen(Math.round(totalEarned))}
         </div>
       )}
