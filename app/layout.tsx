@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Toaster } from '@/components/ToasterClient'
+import ThemeSync from '@/components/theme/ThemeSync'
 import './globals.css'
 
 // Skip static prerendering of all routes — the static-export pass on Linux
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <ThemeSync />
         {children}
         <Toaster richColors position="top-center" />
       </body>

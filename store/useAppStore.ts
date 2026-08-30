@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { TopTab, ModalType } from '@/types'
+import type { ThemeId } from '@/lib/themes'
 import { CONFIG } from '@/lib/constants'
 import { navigateMonth } from '@/lib/dateUtils'
 
@@ -14,12 +15,15 @@ interface AppState {
   modalDateKey: string | null
   // FAB
   fabExpanded: boolean
+  // Theme
+  theme: ThemeId
   // Settings — sourced from the server (User.actualTimesEnabled) on hydration.
   // We keep a local mirror so toggling instantly reflects without a round-trip
   // and so existing reads (`useAppStore().perMinutePay`) keep working.
   perMinutePay: boolean
   // Actions
   setTab: (tab: TopTab) => void
+  setTheme: (theme: ThemeId) => void
   changeMonth: (delta: number) => void
   goToday: () => void
   setModal: (modal: ModalType, dateKey?: string) => void
@@ -43,9 +47,17 @@ export const useAppStore = create<AppState>()(
       openModal: null,
       modalDateKey: null,
       fabExpanded: false,
+      theme: 'midnight',
       perMinutePay: false,
 
       setTab: (tab) => set({ activeTab: tab }),
+
+      setTheme: (theme) => {
+        set({ theme })
+        if (typeof document !== 'undefined') {
+          document.documentElement.setAttribute('data-theme', theme)
+        }
+      },
 
       changeMonth: (delta) => {
         const { curY, curM } = get()
@@ -94,10 +106,10 @@ export const useAppStore = create<AppState>()(
     {
       name: 'bow_app_state',
       partialize: (s) => ({
-        // `curY` / `curM` are genuinely client-only UX state; `perMinutePay`
+        // `curY` / `curM` / `theme` are client-only UX state; `perMinutePay`
         // is also persisted as a best-effort mirror but the server copy is
         // authoritative — hydration on session load overrides this.
-        curY: s.curY, curM: s.curM, perMinutePay: s.perMinutePay,
+        curY: s.curY, curM: s.curM, theme: s.theme, perMinutePay: s.perMinutePay,
       }),
     }
   )

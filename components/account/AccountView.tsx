@@ -2,13 +2,16 @@
 
 import { useState, useEffect, useCallback, useTransition } from 'react'
 import Link from 'next/link'
-import { Settings, Shield, ArrowRight } from 'lucide-react'
+import { Shield, ArrowRight, Save, Info, HelpCircle } from 'lucide-react'
 import { AuthUser } from '@/lib/auth/session'
 import { updateAccount, resendVerificationEmailAction } from '@/app/actions/account'
 import { logoutAction } from '@/app/auth/actions'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import SettingsView from '@/components/settings/SettingsView'
+import { useAppStore } from '@/store/useAppStore'
+import { ThemeDropdown } from '@/components/theme/ThemeSelector'
+import ToggleSwitch from '@/components/ui/ToggleSwitch'
+import BackupPanel from '@/components/settings/BackupPanel'
 
 const CURRENCIES = [
   { value: 'JPY', label: 'JPY', symbol: '¥', flag: '🇯🇵' },
@@ -46,6 +49,8 @@ export default function AccountView({ user }: { user: AuthUser }) {
   const [isResending, startResend] = useTransition()
   const isVerified = !!user.emailVerified
 
+  const { perMinutePay, setPerMinutePay } = useAppStore()
+
   // ── Draft state (initialised from props) ──
   const [name, setName] = useState(user.name)
   const [email, setEmail] = useState(user.email)
@@ -81,6 +86,15 @@ export default function AccountView({ user }: { user: AuthUser }) {
     setIsPending(false)
   }
 
+  const handleTogglePerMinute = async (next: boolean) => {
+    const res = await setPerMinutePay(next)
+    if (!res.success) {
+      toast.error(res.error || 'Failed to save preference')
+    } else {
+      toast.success(next ? 'Per-minute pay enabled' : 'Per-minute pay disabled')
+    }
+  }
+
   const handleResend = useCallback(() => {
     startResend(async () => {
       const res = await resendVerificationEmailAction(user.email)
@@ -94,165 +108,183 @@ export default function AccountView({ user }: { user: AuthUser }) {
 
   return (
     <div style={{
-      minHeight: '100%',
-      padding: '0 0 120px 0',
-      background: 'var(--bg)',
+      maxWidth: 720,
+      margin: '0 auto',
+      padding: '16px 16px 120px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 14,
       animation: 'slideUp 0.3s ease',
     }}>
 
-      {/* ── Profile Header Card ───────────────── */}
+      {/* ── 1. Profile Header Card ───────────────── */}
       <div style={{
-        margin: 16,
         padding: '16px 18px',
         background: 'var(--card)',
         border: '1px solid var(--border)',
         borderRadius: 16,
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
         gap: 14,
       }}>
-        <div style={{
-          width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
-          background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 20, fontWeight: 800, color: '#fff',
-          boxShadow: '0 0 0 3px rgba(59,130,246,0.22)',
-          fontFamily: 'var(--display)',
-        }}>
-          {getInitials(user.name)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            width: 50, height: 50, borderRadius: '50%', flexShrink: 0,
+            background: 'linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, fontWeight: 800, color: '#fff',
+            boxShadow: '0 0 0 3px rgba(99,102,241,0.25)',
+            fontFamily: 'var(--display)',
+          }}>
+            {getInitials(user.name)}
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <h2 style={{
+                fontSize: 16, fontWeight: 800, fontFamily: 'var(--display)',
+                margin: 0, color: 'var(--text)',
+              }}>
+                {user.name}
+              </h2>
+              {user.role === 'ADMIN' && (
+                <span style={{
+                  fontSize: 9, fontWeight: 800, letterSpacing: '0.04em',
+                  padding: '2px 7px', borderRadius: 999,
+                  background: 'rgba(99,102,241,0.2)', color: '#a5b4fc',
+                  border: '1px solid rgba(99,102,241,0.4)',
+                }}>
+                  ADMIN
+                </span>
+              )}
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--muted)', margin: '2px 0 0' }}>
+              {user.email}
+            </p>
+          </div>
         </div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <h2 style={{
-              fontSize: 16, fontWeight: 800, fontFamily: 'var(--display)',
-              margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {user.name}
-            </h2>
-            {user.role === 'ADMIN' && (
-              <span style={{
-                fontSize: 9.5, fontWeight: 800, letterSpacing: '0.04em',
-                padding: '2px 7px', borderRadius: 999,
-                background: 'rgba(99,102,241,0.2)', color: '#a5b4fc',
-                border: '1px solid rgba(99,102,241,0.4)',
-              }}>
-                ADMIN
-              </span>
-            )}
-          </div>
-          <p style={{ fontSize: 12, color: 'var(--muted)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {user.email}
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6,
-            padding: '2px 9px', borderRadius: 20, fontSize: 10, fontWeight: 700,
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
             background: isVerified ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)',
             color: isVerified ? '#34d399' : '#fbbf24',
-            border: `1px solid ${isVerified ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`,
+            border: `1px solid ${isVerified ? 'rgba(16,185,129,0.28)' : 'rgba(245,158,11,0.28)'}`,
           }}>
             <span>{isVerified ? '✓' : '!'}</span>
-            <span>{isVerified ? 'Verified' : 'Not Verified'}</span>
+            <span>{isVerified ? 'Verified' : 'Unverified'}</span>
           </div>
+
+          <Link
+            href={`/feedback?from=${encodeURIComponent('/account')}`}
+            style={{
+              padding: '6px 12px', borderRadius: 8,
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid var(--border)',
+              color: 'var(--text)', fontSize: 12, fontWeight: 700,
+              textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5,
+            }}
+          >
+            <span>💬</span> Feedback
+          </Link>
         </div>
       </div>
 
-      {/* ── Admin Dashboard Quick Redirect (Admin only) ── */}
+      {/* ── 2. Admin Quick Banner (Admins only) ──── */}
       {user.role === 'ADMIN' && (
-        <div style={{ margin: '0 16px 14px' }}>
-          <Link
-            href="/admin"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '13px 16px',
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.16) 0%, rgba(59,130,246,0.14) 100%)',
-              border: '1px solid rgba(99,102,241,0.38)',
-              borderRadius: 14,
-              textDecoration: 'none',
-              color: 'var(--text)',
-              transition: 'all 0.15s ease',
-              boxShadow: '0 2px 12px rgba(99,102,241,0.15)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10,
-                background: 'rgba(99,102,241,0.24)',
-                border: '1px solid rgba(99,102,241,0.45)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#a5b4fc',
-              }}>
-                <Shield size={19} strokeWidth={2.3} />
-              </div>
-              <div>
-                <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', fontFamily: 'var(--display)' }}>
-                  Admin Dashboard
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>
-                  Users, analytics, audit logs, emails &amp; system status
-                </div>
-              </div>
-            </div>
-            <ArrowRight size={16} color="#a5b4fc" />
-          </Link>
-        </div>
-      )}
-
-      {/* ── Verification Banner (unverified only) ── */}
-      {!isVerified && (
-        <div style={{
-          margin: '0 16px 12px', padding: '14px 16px',
-          background: 'rgba(245,158,11,0.07)',
-          border: '1px solid rgba(245,158,11,0.28)',
-          borderRadius: 14,
-          display: 'flex', flexDirection: 'column', gap: 10,
-        }}>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <Link
+          href="/admin"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '13px 18px',
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.16) 0%, rgba(59,130,246,0.12) 100%)',
+            border: '1px solid rgba(99,102,241,0.38)',
+            borderRadius: 16,
+            textDecoration: 'none',
+            color: 'var(--text)',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-              background: 'rgba(245,158,11,0.14)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
-            }}>⚠️</div>
+              width: 36, height: 36, borderRadius: 10,
+              background: 'rgba(99,102,241,0.25)',
+              border: '1px solid rgba(99,102,241,0.45)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#a5b4fc',
+            }}>
+              <Shield size={18} strokeWidth={2.2} />
+            </div>
             <div>
-              <p style={{ fontWeight: 700, fontSize: 13, color: '#fbbf24', margin: 0 }}>Email not verified</p>
-              <p style={{ fontSize: 11, color: 'var(--muted)', margin: '2px 0 0', lineHeight: 1.45 }}>
-                Verify your email to keep your account secure.
-              </p>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', fontFamily: 'var(--display)' }}>
+                Admin Dashboard
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>
+                Users, analytics, audit logs &amp; system settings
+              </div>
             </div>
           </div>
-          <button onClick={handleResend} disabled={isResending} style={{
-            padding: '9px 14px', borderRadius: 10, width: '100%',
-            background: isResending ? 'var(--surface)' : 'rgba(245,158,11,0.14)',
-            border: '1px solid rgba(245,158,11,0.38)',
-            color: '#fbbf24', fontWeight: 700, fontSize: 12,
-            cursor: isResending ? 'not-allowed' : 'pointer',
-            opacity: isResending ? 0.6 : 1, transition: 'all 0.2s',
-          }}>
-            {isResending ? '✉️  Sending…' : '✉️  Resend Verification Email'}
+          <ArrowRight size={16} color="#a5b4fc" />
+        </Link>
+      )}
+
+      {/* ── 3. Unverified Email Banner ──────────── */}
+      {!isVerified && (
+        <div style={{
+          padding: '14px 16px',
+          background: 'rgba(245,158,11,0.08)',
+          border: '1px solid rgba(245,158,11,0.3)',
+          borderRadius: 16,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12,
+        }}>
+          <div>
+            <p style={{ fontWeight: 700, fontSize: 13, color: '#fbbf24', margin: 0 }}>
+              ⚠️ Email not verified
+            </p>
+            <p style={{ fontSize: 11, color: 'var(--muted)', margin: '2px 0 0' }}>
+              Please verify your email address to secure your account.
+            </p>
+          </div>
+          <button
+            onClick={handleResend}
+            disabled={isResending}
+            style={{
+              padding: '8px 14px', borderRadius: 8,
+              background: isResending ? 'var(--surface)' : 'rgba(245,158,11,0.18)',
+              border: '1px solid rgba(245,158,11,0.45)',
+              color: '#fbbf24', fontWeight: 700, fontSize: 12,
+              cursor: isResending ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isResending ? 'Sending…' : '✉️ Resend Verification'}
           </button>
         </div>
       )}
 
-      {/* ── Form ──────────────────────────────── */}
-      <form onSubmit={handleSubmit} style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-        {/* Profile Card */}
+      {/* ── 4. Main Settings Form (Horizontal Rows) ── */}
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        
+        {/* Profile Information Section */}
         <div style={{
-          background: 'var(--card)', border: '1px solid var(--border)',
-          borderRadius: 16, overflow: 'hidden',
+          background: 'var(--card)',
+          border: '1px solid var(--border)',
+          borderRadius: 16,
+          overflow: 'hidden',
         }}>
-          <div style={{
-            padding: '12px 16px', borderBottom: '1px solid var(--border)',
-            fontSize: 11, fontWeight: 700, color: 'var(--muted)',
-            textTransform: 'uppercase', letterSpacing: '0.06em',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <span>👤</span> Profile
+          <div style={cardHeaderStyle}>
+            <span>👤</span> Profile Information
           </div>
 
-          <FormRow label="Full Name" icon="✏️">
+          <HorizontalRow label="Full Name" icon="✏️">
             <input
               name="name"
               value={name}
@@ -261,9 +293,9 @@ export default function AccountView({ user }: { user: AuthUser }) {
               placeholder="Your full name"
               style={inputStyle}
             />
-          </FormRow>
+          </HorizontalRow>
 
-          <FormRow label="Email Address" icon="📧">
+          <HorizontalRow label="Email Address" icon="📧">
             <input
               name="email"
               type="email"
@@ -273,9 +305,9 @@ export default function AccountView({ user }: { user: AuthUser }) {
               placeholder="you@example.com"
               style={inputStyle}
             />
-          </FormRow>
+          </HorizontalRow>
 
-          <FormRow label="School Fee Target" icon="🎓" last>
+          <HorizontalRow label="School Fee Target" icon="🎓" last>
             <input
               name="schoolFee"
               type="number"
@@ -285,24 +317,25 @@ export default function AccountView({ user }: { user: AuthUser }) {
               placeholder="840000"
               style={inputStyle}
             />
-          </FormRow>
+          </HorizontalRow>
         </div>
 
-        {/* Preferences Card */}
+        {/* Preferences & Appearance Section */}
         <div style={{
-          background: 'var(--card)', border: '1px solid var(--border)',
-          borderRadius: 16, overflow: 'hidden',
+          background: 'var(--card)',
+          border: '1px solid var(--border)',
+          borderRadius: 16,
+          overflow: 'hidden',
         }}>
-          <div style={{
-            padding: '12px 16px', borderBottom: '1px solid var(--border)',
-            fontSize: 11, fontWeight: 700, color: 'var(--muted)',
-            textTransform: 'uppercase', letterSpacing: '0.06em',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <span>⚙️</span> Preferences
+          <div style={cardHeaderStyle}>
+            <span>⚙️</span> Preferences &amp; Appearance
           </div>
 
-          <FormRow label="Currency" icon="💰">
+          <HorizontalRow label="Theme / Palette" icon="🎨" description="Application color scheme">
+            <ThemeDropdown />
+          </HorizontalRow>
+
+          <HorizontalRow label="Currency" icon="💰">
             <select value={currency} onChange={(e) => setCurrency(e.target.value)} style={inputStyle}>
               {CURRENCIES.map(c => (
                 <option key={c.value} value={c.value}>
@@ -310,9 +343,9 @@ export default function AccountView({ user }: { user: AuthUser }) {
                 </option>
               ))}
             </select>
-          </FormRow>
+          </HorizontalRow>
 
-          <FormRow label="Location" icon="📍" last>
+          <HorizontalRow label="Location" icon="📍">
             <select value={location} onChange={(e) => setLocation(e.target.value)} style={inputStyle}>
               {LOCATIONS.map(l => (
                 <option key={l.value} value={l.value}>
@@ -320,115 +353,185 @@ export default function AccountView({ user }: { user: AuthUser }) {
                 </option>
               ))}
             </select>
-          </FormRow>
+          </HorizontalRow>
+
+          <HorizontalRow
+            label="Per-Minute Pay"
+            icon="⏱️"
+            description="Use exact clock in/out times for precision"
+            last
+          >
+            <ToggleSwitch
+              checked={perMinutePay}
+              onChange={(next) => { void handleTogglePerMinute(next) }}
+            />
+          </HorizontalRow>
         </div>
 
-        {/* Save Button */}
+        {/* Save Changes Button */}
         <button
           type="submit"
           disabled={!isDirty || isPending}
           style={{
             width: '100%', padding: '14px 20px', borderRadius: 14,
-            background: (!isDirty || isPending) ? 'var(--surface)' : 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+            background: (!isDirty || isPending) ? 'var(--surface)' : 'linear-gradient(135deg, var(--accent) 0%, #4f46e5 100%)',
             color: (!isDirty || isPending) ? 'var(--muted2)' : '#fff',
-            border: 'none', fontWeight: 800, fontSize: 14,
+            border: `1px solid ${(!isDirty || isPending) ? 'var(--border)' : 'transparent'}`,
+            fontWeight: 800, fontSize: 14,
             fontFamily: 'var(--display)', cursor: (!isDirty || isPending) ? 'not-allowed' : 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: (!isDirty || isPending) ? 'none' : '0 4px 24px rgba(59,130,246,0.3)',
-            letterSpacing: '0.02em', marginTop: 4,
-            opacity: (!isDirty || isPending) ? 0.5 : 1,
+            transition: 'all 0.2s ease',
+            boxShadow: (!isDirty || isPending) ? 'none' : '0 4px 20px rgba(99,102,241,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}
         >
-          {isPending ? '⏳  Saving…' : '💾  Save Changes'}
+          <Save size={16} />
+          {isPending ? 'Saving Changes…' : isDirty ? 'Save Changes' : 'All Changes Saved'}
         </button>
       </form>
 
-      {/* ── Send feedback (Plan §26) ────────── */}
-      <div style={{ padding: '8px 16px 0 16px' }}>
-        <Link
-          href={`/feedback?from=${encodeURIComponent('/account')}`}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            padding: '11px 12px', borderRadius: 12,
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid var(--border)',
-            color: 'var(--text)',
-            fontWeight: 700, fontSize: 13,
-            textDecoration: 'none',
-          }}
-        >
-          💬 Send feedback
-        </Link>
+      {/* ── 5. Data Management (Export & Import) ─── */}
+      <BackupPanel />
+
+      {/* ── 6. System & App Information ─────────── */}
+      <div style={{
+        background: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: 16,
+        padding: '16px',
+      }}>
+        <div style={{ ...cardHeaderStyle, padding: '0 0 12px 0', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
+          <span><Info size={14} /></span> System &amp; App Information
+        </div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 10,
+          fontSize: 12,
+        }}>
+          <div style={infoBoxStyle}>
+            <span style={{ color: 'var(--muted)' }}>Version</span>
+            <strong style={{ color: 'var(--text)' }}>7.0 (Next.js)</strong>
+          </div>
+          <div style={infoBoxStyle}>
+            <span style={{ color: 'var(--muted)' }}>Weekly Hour Limit</span>
+            <strong style={{ color: 'var(--accent)' }}>28 Hours (Visa)</strong>
+          </div>
+          <div style={infoBoxStyle}>
+            <span style={{ color: 'var(--muted)' }}>School Target</span>
+            <strong style={{ color: 'var(--success)' }}>¥840,000</strong>
+          </div>
+          <div style={infoBoxStyle}>
+            <span style={{ color: 'var(--muted)' }}>Database</span>
+            <strong style={{ color: 'var(--text)' }}>Cloud PostgreSQL</strong>
+          </div>
+          <div style={infoBoxStyle}>
+            <span style={{ color: 'var(--muted)' }}>Active Window</span>
+            <strong style={{ color: 'var(--text)' }}>Apr 2026 – Sep 2027</strong>
+          </div>
+          <div style={infoBoxStyle}>
+            <span style={{ color: 'var(--muted)' }}>Developers</span>
+            <strong style={{ color: 'var(--text)' }}>Nitheshwar &amp; Arockia</strong>
+          </div>
+        </div>
       </div>
 
-      {/* ── Settings & Backup (incl. import/export) — always visible ── */}
-      <div
-        role="region"
-        aria-label="Settings and backup"
-        style={{ padding: '20px 0 4px', animation: 'slideUp 0.25s ease' }}
-      >
-          <div style={{
-            margin: '0 16px 10px',
-            display: 'flex', alignItems: 'center', gap: 8,
-            fontSize: 11, fontWeight: 700, color: 'var(--muted)',
-            textTransform: 'uppercase', letterSpacing: '0.06em',
-          }}>
-            <Settings size={14} strokeWidth={2.4} />
-            <span>Settings · Backup · Import / Export</span>
-          </div>
-          <SettingsView user={user} />
-        </div>
-
-      {/* ── Sign out — lives here, not in the top bar ── */}
-      <div style={{ padding: '24px 16px 8px' }}>
+      {/* ── 7. Sign Out ─────────────────────────── */}
+      <div style={{ marginTop: 4 }}>
         <form action={logoutAction}>
           <button
             type="submit"
             style={{
-              width: '100%', boxSizing: 'border-box',
-              padding: '12px 16px',
-              background: 'rgba(239,68,68,0.09)',
-              border: '1px solid rgba(239,68,68,0.28)',
-              borderRadius: 12,
-              color: '#fca5a5',
+              width: '100%',
+              padding: '13px 16px',
+              background: 'rgba(239,68,68,0.08)',
+              border: '1px solid rgba(239,68,68,0.25)',
+              borderRadius: 14,
+              color: '#f87171',
               fontSize: 13, fontWeight: 700,
               cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              transition: 'background 0.15s ease',
             }}
           >
-            Sign out{user?.name ? ` (${user.name})` : ''}
+            <span>🚪</span> Sign Out{user?.name ? ` (${user.name})` : ''}
           </button>
         </form>
       </div>
+
     </div>
   )
 }
 
-const inputStyle: React.CSSProperties = {
-  padding: '9px 11px', borderRadius: 8,
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid var(--border)',
-  color: 'var(--text)', fontSize: 14, width: '100%', boxSizing: 'border-box',
-}
-
-function FormRow({
-  label, icon, children, last,
+/* ── Reusable Horizontal Form Row Component ──────────────────────── */
+function HorizontalRow({
+  label, icon, description, children, last,
 }: {
-  label: string; icon: string; children: React.ReactNode; last?: boolean;
+  label: string
+  icon: string
+  description?: string
+  children: React.ReactNode
+  last?: boolean
 }) {
   return (
     <div style={{
       padding: '12px 16px',
       borderBottom: last ? 'none' : '1px solid var(--border)',
-      display: 'flex', flexDirection: 'column', gap: 6,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 16,
+      minHeight: 48,
     }}>
-      <label style={{
-        fontSize: 11, color: 'var(--muted)', fontWeight: 600,
-        textTransform: 'uppercase', letterSpacing: '0.05em',
-        display: 'flex', alignItems: 'center', gap: 5,
-      }}>
-        <span>{icon}</span> {label}
-      </label>
-      {children}
+      <div style={{ flex: '1 1 140px', minWidth: 120 }}>
+        <div style={{
+          fontSize: 13, color: 'var(--text)', fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: 7,
+        }}>
+          <span style={{ fontSize: 14 }}>{icon}</span> {label}
+        </div>
+        {description && (
+          <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>
+            {description}
+          </div>
+        )}
+      </div>
+      <div style={{ flex: '1 1 240px', maxWidth: 280, display: 'flex', justifyContent: 'flex-end' }}>
+        {children}
+      </div>
     </div>
   )
+}
+
+const cardHeaderStyle: React.CSSProperties = {
+  padding: '12px 16px',
+  borderBottom: '1px solid var(--border)',
+  fontSize: 11,
+  fontWeight: 700,
+  color: 'var(--muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+}
+
+const inputStyle: React.CSSProperties = {
+  padding: '9px 12px',
+  borderRadius: 8,
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid var(--border)',
+  color: 'var(--text)',
+  fontSize: 13.5,
+  width: '100%',
+  boxSizing: 'border-box',
+}
+
+const infoBoxStyle: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.025)',
+  border: '1px solid var(--border)',
+  borderRadius: 10,
+  padding: '8px 12px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
 }

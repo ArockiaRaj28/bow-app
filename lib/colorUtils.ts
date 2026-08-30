@@ -12,8 +12,15 @@
  * Pure functions, no deps — deterministic and SSR-safe.
  */
 
-const BG = '#0f121c'        // ≈ var(--card) family, mix target for surfaces
-const NEUTRAL = '#cbd5e1'   // soft slate neutral, mix target for text
+import type { ThemeId } from './themes'
+
+const THEME_TARGETS: Record<ThemeId, { bg: string; neutral: string }> = {
+  midnight:  { bg: '#0a0c14', neutral: '#cbd5e1' },
+  tokyo:     { bg: '#0c0d14', neutral: '#dcd6f7' },
+  cyberpunk: { bg: '#06070a', neutral: '#cce3f0' },
+  aurora:    { bg: '#081111', neutral: '#c4dede' },
+  amber:     { bg: '#0d0b09', neutral: '#dfd5cb' },
+}
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '')
@@ -37,17 +44,24 @@ export function mixHex(a: string, b: string, t: number): string {
   return rgbToHex(r1 + (r2 - r1) * t, g1 + (g2 - g1) * t, b1 + (b2 - b1) * t)
 }
 
+export function getThemeTargets(themeId?: ThemeId) {
+  return THEME_TARGETS[themeId || 'midnight'] || THEME_TARGETS.midnight
+}
+
 /** Dulled solid for the day-cell hour bars, borders, and legend indicators. */
-export function mutedBar(jobColor: string): string {
-  return mixHex(jobColor, BG, 0.50)
+export function mutedBar(jobColor: string, themeId?: ThemeId): string {
+  const { bg } = getThemeTargets(themeId)
+  return mixHex(jobColor, bg, 0.48)
 }
 
-/** Pastel text that keeps the job's hue in a gentle, non-glaring tone. */
-export function mutedText(jobColor: string): string {
-  return mixHex(jobColor, NEUTRAL, 0.48)
+/** Pastel text that keeps the job's hue in a gentle, theme-harmonized tone. */
+export function mutedText(jobColor: string, themeId?: ThemeId): string {
+  const { neutral } = getThemeTargets(themeId)
+  return mixHex(jobColor, neutral, 0.46)
 }
 
-/** Dark chip background subtly tinted with the job's hue. */
-export function mutedChipBg(jobColor: string): string {
-  return mixHex(BG, jobColor, 0.16)
+/** Dark chip background subtly tinted with the job's hue, matched to the theme's background. */
+export function mutedChipBg(jobColor: string, themeId?: ThemeId): string {
+  const { bg } = getThemeTargets(themeId)
+  return mixHex(bg, jobColor, 0.18)
 }

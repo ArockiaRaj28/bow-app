@@ -8,10 +8,12 @@ import { mutedChipBg, mutedText } from '@/lib/colorUtils'
 import { formatHours, formatYen } from '@/lib/timeUtils'
 import { CONFIG } from '@/lib/constants'
 import ProgressBar from '@/components/ui/ProgressBar'
+import { useAppStore } from '@/store/useAppStore'
 
 interface Props { weekStart: Date; jobs: Job[] }
 
 export default function WeekSummaryRow({ weekStart, jobs }: Props) {
+  const { theme } = useAppStore()
   const stats = useMemo(() => {
     const days = weekDays(weekStart)
     let hours = 0, earned = 0
@@ -63,8 +65,8 @@ export default function WeekSummaryRow({ weekStart, jobs }: Props) {
         <div style={{ display: 'flex', gap: 3 }}>
           {stats.jobsWorked.map(j => (
             <span key={j.id} style={{
-              fontSize: 8, background: mutedChipBg(j.color),
-              color: mutedText(j.color), padding: '1px 4px', borderRadius: 3, fontWeight: 700,
+              fontSize: 8, background: mutedChipBg(j.color, theme),
+              color: mutedText(j.color, theme), padding: '1px 4px', borderRadius: 3, fontWeight: 700,
             }}>{j.name.substring(0, 3)}</span>
           ))}
         </div>

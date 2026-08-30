@@ -1,9 +1,12 @@
+'use client'
+
 import Link from 'next/link'
-import { Shield, ArrowRight } from 'lucide-react'
+import { Shield, ArrowRight, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store/useAppStore'
 import ToggleSwitch from '@/components/ui/ToggleSwitch'
 import BackupPanel from './BackupPanel'
+import { ThemeDropdown } from '@/components/theme/ThemeSelector'
 import type { AuthUser } from '@/lib/auth/session'
 
 export default function SettingsView({ user }: { user?: AuthUser }) {
@@ -19,13 +22,14 @@ export default function SettingsView({ user }: { user?: AuthUser }) {
   }
 
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Admin Panel Redirect (when logged in as ADMIN) */}
       {user?.role === 'ADMIN' && (
         <section style={{
-          ...sectionStyle,
+          padding: '13px 18px',
           background: 'linear-gradient(135deg, rgba(99,102,241,0.14) 0%, rgba(59,130,246,0.12) 100%)',
           border: '1px solid rgba(99,102,241,0.36)',
+          borderRadius: 16,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
             <div style={{ minWidth: 0 }}>
@@ -64,49 +68,129 @@ export default function SettingsView({ user }: { user?: AuthUser }) {
         </section>
       )}
 
-      {/* Per-minute toggle */}
-      <section style={sectionStyle}>
-        <div style={sectionTitle}>Earnings Calculation</div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Per-Minute Pay</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+      {/* Preferences & Appearance Card */}
+      <div style={{
+        background: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: 16,
+        overflow: 'hidden',
+      }}>
+        <div style={cardHeaderStyle}>
+          <span>⚙️</span> Preferences &amp; Earnings
+        </div>
+
+        {/* Theme row */}
+        <div style={horizontalRowStyle}>
+          <div style={{ flex: '1 1 140px', minWidth: 120 }}>
+            <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 7 }}>
+              <span>🎨</span> Theme / Palette
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>
+              Choose your favorite workspace color palette
+            </div>
+          </div>
+          <div style={{ flex: '1 1 240px', maxWidth: 280, display: 'flex', justifyContent: 'flex-end' }}>
+            <ThemeDropdown />
+          </div>
+        </div>
+
+        {/* Per-minute pay row */}
+        <div style={{ ...horizontalRowStyle, borderBottom: 'none' }}>
+          <div style={{ flex: '1 1 140px', minWidth: 120 }}>
+            <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 7 }}>
+              <span>⏱️</span> Per-Minute Pay
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>
               Track actual clock-in/out for precise earnings
             </div>
           </div>
-          <ToggleSwitch
-            checked={perMinutePay}
-            onChange={(next) => { void handleToggle(next) }}
-          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <ToggleSwitch
+              checked={perMinutePay}
+              onChange={(next) => { void handleToggle(next) }}
+            />
+          </div>
         </div>
-      </section>
+      </div>
 
       {/* Export / Import */}
       <BackupPanel />
 
-      {/* About */}
-      <section style={sectionStyle}>
-        <div style={sectionTitle}>About BOW</div>
-        <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.7 }}>
-          <div><strong style={{ color: 'var(--text)' }}>Version:</strong> 7.0 (Next.js)</div>
-          <div><strong style={{ color: 'var(--text)' }}>Developed by:</strong> Nitheshwar &amp; Arockia</div>
-          <div><strong style={{ color: 'var(--text)' }}>Purpose:</strong> Japan student visa compliance &amp; budget tracking</div>
-          <div><strong style={{ color: 'var(--text)' }}>Data:</strong> Cloud database (Neon PostgreSQL)</div>
-          <div><strong style={{ color: 'var(--text)' }}>Features:</strong> Account system, email verification, expense tracking with categories</div>
-          <div><strong style={{ color: 'var(--text)' }}>Date range:</strong> Apr 2026 – Sep 2027 (18 months)</div>
-          <div><strong style={{ color: 'var(--text)' }}>Weekly limit:</strong> 28 hours (Japan visa rule)</div>
-          <div><strong style={{ color: 'var(--text)' }}>School fee target:</strong> ¥840,000</div>
+      {/* About & System Specs */}
+      <div style={{
+        background: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: 16,
+        padding: '16px',
+      }}>
+        <div style={{ ...cardHeaderStyle, padding: '0 0 12px 0', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
+          <span><Info size={14} /></span> About BOW
         </div>
-      </section>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 10,
+          fontSize: 12,
+        }}>
+          <div style={infoBoxStyle}>
+            <span style={{ color: 'var(--muted)' }}>Version</span>
+            <strong style={{ color: 'var(--text)' }}>7.0 (Next.js)</strong>
+          </div>
+          <div style={infoBoxStyle}>
+            <span style={{ color: 'var(--muted)' }}>Weekly Hour Limit</span>
+            <strong style={{ color: 'var(--accent)' }}>28 Hours (Visa)</strong>
+          </div>
+          <div style={infoBoxStyle}>
+            <span style={{ color: 'var(--muted)' }}>School Target</span>
+            <strong style={{ color: 'var(--success)' }}>¥840,000</strong>
+          </div>
+          <div style={infoBoxStyle}>
+            <span style={{ color: 'var(--muted)' }}>Database</span>
+            <strong style={{ color: 'var(--text)' }}>Cloud PostgreSQL</strong>
+          </div>
+          <div style={infoBoxStyle}>
+            <span style={{ color: 'var(--muted)' }}>Active Window</span>
+            <strong style={{ color: 'var(--text)' }}>Apr 2026 – Sep 2027</strong>
+          </div>
+          <div style={infoBoxStyle}>
+            <span style={{ color: 'var(--muted)' }}>Developers</span>
+            <strong style={{ color: 'var(--text)' }}>Nitheshwar &amp; Arockia</strong>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--card)',
-  borderRadius: 12, padding: 14, marginBottom: 12,
+const cardHeaderStyle: React.CSSProperties = {
+  padding: '12px 16px',
+  borderBottom: '1px solid var(--border)',
+  fontSize: 11,
+  fontWeight: 700,
+  color: 'var(--muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
 }
-const sectionTitle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 700, color: 'var(--muted)',
-  textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8,
+
+const horizontalRowStyle: React.CSSProperties = {
+  padding: '12px 16px',
+  borderBottom: '1px solid var(--border)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 16,
+  minHeight: 48,
+}
+
+const infoBoxStyle: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.025)',
+  border: '1px solid var(--border)',
+  borderRadius: 10,
+  padding: '8px 12px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
 }
