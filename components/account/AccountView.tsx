@@ -108,7 +108,7 @@ export default function AccountView({ user }: { user: AuthUser }) {
 
   return (
     <div style={{
-      maxWidth: 720,
+      maxWidth: 1024,
       margin: '0 auto',
       padding: '16px 16px 120px',
       display: 'flex',
@@ -270,8 +270,10 @@ export default function AccountView({ user }: { user: AuthUser }) {
         </div>
       )}
 
-      {/* ── 4. Main Settings Form (Horizontal Rows) ── */}
+      {/* ── 4. Main Settings Form ── */}
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* Two-column layout: Profile + Preferences sit side-by-side on wide screens */}
+        <div style={twoColumnGridStyle}>
         
         {/* Profile Information Section */}
         <div style={{
@@ -367,6 +369,7 @@ export default function AccountView({ user }: { user: AuthUser }) {
             />
           </HorizontalRow>
         </div>
+        </div>
 
         {/* Save Changes Button */}
         <button
@@ -404,7 +407,7 @@ export default function AccountView({ user }: { user: AuthUser }) {
         </div>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
           gap: 10,
           fontSize: 12,
         }}>
@@ -534,4 +537,11 @@ const infoBoxStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 2,
+}
+
+const twoColumnGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+  gap: 14,
+  alignItems: 'start',
 }
