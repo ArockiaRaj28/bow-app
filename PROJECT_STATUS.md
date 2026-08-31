@@ -113,9 +113,7 @@ production database (login → action → DB row verified):
 
 ## 6. Known limitations (accepted, not broken)
 
-- **Goal creation UI** uses three chained `window.prompt()` dialogs with no
-  deadline format validation. Works on desktop browsers; some mobile
-  webviews block `prompt()`. Top UX-debt item.
+- **Goal creation UI** resolved — `prompt()` chain replaced with `GoalFormModal` (v7.2).
 - CSV import and expenses/goals import with populated data are code-reviewed
   but not yet exercised with large real files.
 - Admin pages (`/admin/*`) exist and are role-guarded but were not part of
@@ -134,7 +132,9 @@ production database (login → action → DB row verified):
   pass (this document)
 
 **Next versions**
-- **v7.2** — smart weekly visa guard; payday forecast; improved goal planner
+- **v7.2** — smart weekly visa guard (engine + dialog + settings toggle); payday forecast; improved goal planner
+  - Visa guard: prospective week projection warns *before* saving shifts that would push a week over 24h (near) or 28h (over). Wired into ShiftEntryModal / ApplyTemplateModal / DayModal. `User.visaGuardEnabled` toggle in Account settings.
+  - Goal planner: `GoalFormModal` replaces the old `window.prompt()` chain.
 - **v7.3** — recurring bills; bill reminders; monthly budget forecast
 - **v7.4** — monthly report page; PDF export; full account export; account delete
 - **v7.5** — job-specific paydays; transport reimbursement; break rules; multi-job forecast
