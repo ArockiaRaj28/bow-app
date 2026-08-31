@@ -14,7 +14,23 @@ interface ShiftHoursResult {
   night: number   // night-rate hours
 }
 
-/** Calculate day/night hours for a shift */
+/** Calculate day/night hours for a shift.
+ *
+ *  Japan part-time pay semantics — important invariant:
+ *  - Breaks ARE UNPAID. The employee clocks out for the break window, so
+ *    minutes inside any `break` (or `actualBreak` if per-minute mode is on)
+ *    are not counted toward worked hours or pay. This matches standard
+ *    Japanese practice (the break is *given* but typically unpaid unless a
+ *    shop's labour agreement says otherwise).
+ *  - When `actualLogin`/`actualLogout` are set, pay is calculated minute-by-
+ *    minute — any overrun past the scheduled clock-out IS paid. Example:
+ *    sched 09:00–17:00 + actualLogout 17:02 → 8h 02min paid.
+ *  - We do NOT auto-subtract a "legal required break" from paid hours. The
+ *    Japan Labor Standards Act requires the *employer* to give the break,
+ *    not the *employee* to lose pay for it. The `requiredBreakMins` /
+ *    `defaultBreakWindow` helpers are advisory only (used by the form UI
+ *    to prompt the user to log their break).
+ */
 export function calcShiftHours(shift: Shift): ShiftHoursResult {
   const useStart  = shift.actualLogin  || shift.start
   const useEnd    = shift.actualLogout || shift.end
@@ -43,15 +59,16 @@ export function calcShiftHours(shift: Shift): ShiftHoursResult {
     const norm = m % (24 * 60)
     if (norm >= 22 * 60 || norm < 5 * 60) {
       nightMins++
+
     } else {
       dayMins++
     }
   }
 
   const dayH   = dayMins / 60
-  const nightH = nightMins / 60
-  return { total: dayH + nightH, day: dayH, night: nightH }
-}
+      const nightH = nightMins / 60
+      return { total: dayH + nightH, day: dayH, night: nightH }
+    }
 
 /** Calculate earnings for a shift */
 export function calcShiftEarned(shift: Shift, job: Job): number {
