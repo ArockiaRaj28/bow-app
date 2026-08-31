@@ -132,9 +132,10 @@ production database (login → action → DB row verified):
   pass (this document)
 
 **Next versions**
-- **v7.2** — smart weekly visa guard (engine + dialog + settings toggle); payday forecast; improved goal planner
+- **v7.2** — smart weekly visa guard (engine + dialog + settings toggle); payday forecast; improved goal planner; admin-editable App Info card
   - Visa guard: prospective week projection warns *before* saving shifts that would push a week over 24h (near) or 28h (over). Wired into ShiftEntryModal / ApplyTemplateModal / DayModal. `User.visaGuardEnabled` toggle in Account settings.
   - Goal planner: `GoalFormModal` replaces the old `window.prompt()` chain.
+  - App Info card: admins edit the user-facing "System & App Information" card on the Account page directly from `/admin/settings` (Version, Weekly Hour Limit, School Target, Database, Active Window, Developers). Backed by the `AppInfo` singleton row; edits audited as `admin.update_app_info`.
 - **v7.3** — recurring bills; bill reminders; monthly budget forecast
 - **v7.4** — monthly report page; PDF export; full account export; account delete
 - **v7.5** — job-specific paydays; transport reimbursement; break rules; multi-job forecast
@@ -144,6 +145,12 @@ production database (login → action → DB row verified):
 Suggested v7.2 quick wins from the stabilization pass: replace the
 `prompt()` goal form with a proper modal (add deadline validation), and
 add an import-preview/dry-run before replace mode wipes data.
+
+**2026-08-31 — App Info card made admin-editable.** `AppInfo` Prisma
+model (singleton id=1) holds the 6 user-facing fields shown on every
+Account page. Admins edit via `/admin/settings → User-Facing App Info
+Card`. All edits audited. New helper: `node scripts/db-push.sh.js`
+to push schema + regenerate client against the running container.
 
 ## 8. Dev quick reference
 
