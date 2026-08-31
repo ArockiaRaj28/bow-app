@@ -2,6 +2,8 @@ import { prisma } from '@/lib/auth/prisma'
 import { requireAdmin } from '@/lib/auth/guards'
 import { CONFIG } from '@/lib/constants'
 import { FROM_EMAIL, transporter } from '@/lib/auth/smtp'
+import { getAppInfo } from '@/app/actions/admin/appInfo'
+import AppInfoEditor from '@/components/admin/AppInfoEditor'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +55,10 @@ export default async function AdminSettingsPage() {
   const smtpPort = Number(process.env.SMTP_PORT) || 587
   const smtpConfigured = !!transporter
   const nodeEnv = process.env.NODE_ENV || 'development'
+
+  // AppInfo row drives the user-facing "System & App Information" card.
+  // Admins edit it inline below; the Account page renders the same row.
+  const appInfo = await getAppInfo()
 
   return (
     <div style={{ maxWidth: 880, margin: '0 auto' }}>
@@ -124,7 +130,19 @@ export default async function AdminSettingsPage() {
         </div>
       </Section>
 
-      {/* 3. SMTP & Email Provider */}
+      {/* 3. App Info Card (user-facing copy edited here) */}
+      <Section title="User-Facing App Info Card">
+        <p style={{
+          fontSize: 11, color: 'var(--muted)', margin: '0 0 10px 0', lineHeight: 1.5,
+        }}>
+          These values power the <strong>System & App Information</strong> card
+          on every user&apos;s Account page. Edit them inline and the change is
+          live for everyone on the next page render.
+        </p>
+        <AppInfoEditor initial={appInfo} />
+      </Section>
+
+      {/* 4. SMTP & Email Provider */}
       <Section title="Email & Delivery Service">
         <div style={{
           background: 'var(--card)',

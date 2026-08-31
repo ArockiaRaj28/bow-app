@@ -48,6 +48,7 @@ model User {
   adminAuditActions   AdminAuditLog[]      @relation("AdminAuditLogActor")
   emailLogs           EmailLog[]
   feedback            UserFeedback[]
+  appInfoEdits        AppInfo[]
 
   @@map("users")
 }
@@ -289,6 +290,32 @@ model UserBudgetMonthMeta {
   @@unique([userId, monthKey])
   @@index([userId])
   @@map("user_budget_month_metas")
+}
+
+model AppInfo {
+  /// Singleton row (id = 1) holding the user-facing "System & App
+  /// Information" card values. Admins edit these from /admin/settings;
+  /// the Account page renders them for every signed-in user.
+  id               Int      @id @default(1)
+  /// Build / release label shown to users (e.g. "v7.2 — Smart Visa Guard").
+  version          String   @default("v7.2") @db.VarChar(64)
+  /// Weekly hour cap shown to users (e.g. "28 Hours (Visa)").
+  weeklyHourLimit  String   @default("28 Hours (Visa)") @db.VarChar(64)
+  /// School fee / savings target shown to users (e.g. "¥840,000").
+  schoolTarget     String   @default("¥840,000") @db.VarChar(64)
+  /// Storage / DB label (e.g. "Cloud PostgreSQL").
+  database         String   @default("Cloud PostgreSQL") @db.VarChar(64)
+  /// Active coverage window label (e.g. "Apr 2026 – Sep 2027").
+  activeWindow     String   @default("Apr 2026 – Sep 2027") @db.VarChar(64)
+  /// Developers / maintainer names (e.g. "Nitheshwar & Arockia").
+  developers       String   @default("Nitheshwar & Arockia") @db.VarChar(128)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// User id of the last admin who edited the row (for audit hint).
+  updatedBy        String?  @db.Uuid
+
+  updatedByUser User? @relation(fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@map("app_info")
 }
 
 model UserBudgetGoal {

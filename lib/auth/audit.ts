@@ -31,6 +31,7 @@ export type AdminAuditAction =
   | 'admin.force_logout_user'
   | 'admin.set_user_role'
   | 'admin.set_feedback_status'
+  | 'admin.update_app_info'
 
 export type AdminAuditTargetType = 'user' | null
 

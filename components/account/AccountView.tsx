@@ -6,12 +6,26 @@ import { Shield, ArrowRight, Save, Info, HelpCircle } from 'lucide-react'
 import { AuthUser } from '@/lib/auth/session'
 import { updateAccount, resendVerificationEmailAction } from '@/app/actions/account'
 import { logoutAction } from '@/app/auth/actions'
+import { getAppInfo, type AppInfoValues } from '@/app/actions/admin/appInfo'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store/useAppStore'
 import { ThemeDropdown } from '@/components/theme/ThemeSelector'
 import ToggleSwitch from '@/components/ui/ToggleSwitch'
 import BackupPanel from '@/components/settings/BackupPanel'
+
+// Static fallback while the server row loads. The real values come
+// from the AppInfo row (admin-editable in /admin/settings).
+const FALLBACK_APP_INFO: AppInfoValues = {
+  version: 'v7.2',
+  weeklyHourLimit: '28 Hours (Visa)',
+  schoolTarget: '¥840,000',
+  database: 'Cloud PostgreSQL',
+  activeWindow: 'Apr 2026 – Sep 2027',
+  developers: 'Nitheshwar & Arockia',
+  updatedAt: new Date(0),
+  updatedBy: null,
+}
 
 const CURRENCIES = [
   { value: 'JPY', label: 'JPY', symbol: '¥', flag: '🇯🇵' },
@@ -50,6 +64,17 @@ export default function AccountView({ user }: { user: AuthUser }) {
   const isVerified = !!user.emailVerified
 
   const { perMinutePay, setPerMinutePay, visaGuardEnabled, setVisaGuard } = useAppStore()
+
+  // System & App Information row (admin-editable). Fetched on mount via
+  // server action; while loading, FALLBACK_APP_INFO is shown.
+  const [appInfo, setAppInfo] = useState<AppInfoValues>(FALLBACK_APP_INFO)
+  useEffect(() => {
+    let cancelled = false
+    void getAppInfo()
+      .then((row) => { if (!cancelled) setAppInfo(row) })
+      .catch((err) => console.warn('[AccountView] getAppInfo failed', err))
+    return () => { cancelled = true }
+  }, [])
 
   // ── Draft state (initialised from props) ──
   const [name, setName] = useState(user.name)
@@ -423,7 +448,7 @@ export default function AccountView({ user }: { user: AuthUser }) {
         padding: '16px',
       }}>
         <div style={{ ...cardHeaderStyle, padding: '0 0 12px 0', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
-          <span><Info size={14} /></span> System &amp; App Information
+          <span><Info size={14} /></span> System & App Information
         </div>
         <div style={{
           display: 'grid',
@@ -433,27 +458,27 @@ export default function AccountView({ user }: { user: AuthUser }) {
         }}>
           <div style={infoBoxStyle}>
             <span style={{ color: 'var(--muted)' }}>Version</span>
-            <strong style={{ color: 'var(--text)' }}>7.0 (Next.js)</strong>
+            <strong style={{ color: 'var(--text)' }}>{appInfo.version}</strong>
           </div>
           <div style={infoBoxStyle}>
             <span style={{ color: 'var(--muted)' }}>Weekly Hour Limit</span>
-            <strong style={{ color: 'var(--accent)' }}>28 Hours (Visa)</strong>
+            <strong style={{ color: 'var(--accent)' }}>{appInfo.weeklyHourLimit}</strong>
           </div>
           <div style={infoBoxStyle}>
             <span style={{ color: 'var(--muted)' }}>School Target</span>
-            <strong style={{ color: 'var(--success)' }}>¥840,000</strong>
+            <strong style={{ color: 'var(--success)' }}>{appInfo.schoolTarget}</strong>
           </div>
           <div style={infoBoxStyle}>
             <span style={{ color: 'var(--muted)' }}>Database</span>
-            <strong style={{ color: 'var(--text)' }}>Cloud PostgreSQL</strong>
+            <strong style={{ color: 'var(--text)' }}>{appInfo.database}</strong>
           </div>
           <div style={infoBoxStyle}>
             <span style={{ color: 'var(--muted)' }}>Active Window</span>
-            <strong style={{ color: 'var(--text)' }}>Apr 2026 – Sep 2027</strong>
+            <strong style={{ color: 'var(--text)' }}>{appInfo.activeWindow}</strong>
           </div>
           <div style={infoBoxStyle}>
             <span style={{ color: 'var(--muted)' }}>Developers</span>
-            <strong style={{ color: 'var(--text)' }}>Nitheshwar &amp; Arockia</strong>
+            <strong style={{ color: 'var(--text)' }}>{appInfo.developers}</strong>
           </div>
         </div>
       </div>
