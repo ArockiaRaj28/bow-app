@@ -4,7 +4,7 @@ import type { Job, ShiftsStore } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useShiftsStore } from '@/store/useShiftsStore'
 import { dateKey, getWeekStart } from '@/lib/dateUtils'
-import { getDayHours, getNightHours } from '@/lib/dayHours'
+import { getDayHours, getNightHours, getDayEarnedScheduled, getDayEarnedActual, hasActualTimes } from '@/lib/dayHours'
 import { mutedBar, mutedChipBg, mutedText } from '@/lib/colorUtils'
 import { formatHours, formatYen } from '@/lib/timeUtils'
 import { CONFIG } from '@/lib/constants'
@@ -34,11 +34,9 @@ export default function CalendarCell({ day, isToday, isOrientation, jobs, shifts
   })).filter(jh => jh.total > 0)
 
   const totalHours = jobHours.reduce((s, jh) => s + jh.total, 0)
-  const totalEarned = jobHours.reduce((s, jh) => {
-    const day2 = jh.total - jh.night
-    const nightRate = jh.job.nightRate || Math.round(jh.job.rate * 1.25)
-    return s + day2 * jh.job.rate + jh.night * nightRate
-  }, 0)
+  const scheduledEarned = getDayEarnedScheduled(dk, jobs)
+  const actualEarned    = getDayEarnedActual(dk, jobs)
+  const showActualLine  = hasActualTimes(dk) && Math.abs(actualEarned - scheduledEarned) > 0.5
 
   // Week hours for over-limit check
   const ws = getWeekStart(day)
@@ -126,12 +124,25 @@ export default function CalendarCell({ day, isToday, isOrientation, jobs, shifts
         </div>
       ))}
 
-      {/* Earnings */}
-      {totalHours > 0 && (
-        <div style={{ fontSize: 9, color: 'var(--green2)', fontWeight: 700, marginTop: 1, opacity: 0.9 }}>
-          {formatYen(Math.round(totalEarned))}
-        </div>
-      )}
+      {/* Earnings — scheduled (per-shift start/end) line + actual (per-minute) line when they differ */}
+            {totalHours > 0 && (
+              <div style={{ marginTop: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                <div
+                  title="Scheduled earnings (per-shift start/end × rate)"
+                  style={{ fontSize: 9, color: 'var(--green2)', fontWeight: 700, opacity: 0.9 }}
+                >
+                  {formatYen(Math.round(scheduledEarned))}
+                </div>
+                {showActualLine && (
+                  <div
+                    title="Per-minute actual earnings (actualLogin/actualLogout × rate)"
+                    style={{ fontSize: 8.5, color: 'var(--info)', fontWeight: 700, opacity: 0.95 }}
+                  >
+                    ⏱ {formatYen(Math.round(actualEarned))}
+                  </div>
+                )}
+              </div>
+            )}
     </div>
   )
 }

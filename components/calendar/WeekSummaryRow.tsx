@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import type { Job } from '@/types'
 import { weekDays, dateKey } from '@/lib/dateUtils'
-import { getDayHours, getNightHours } from '@/lib/dayHours'
+import { getDayHours, getNightHours, getDayEarnedScheduled, getDayEarnedActual, hasActualTimes } from '@/lib/dayHours'
 import { mutedChipBg, mutedText } from '@/lib/colorUtils'
 import { formatHours, formatYen } from '@/lib/timeUtils'
 import { CONFIG } from '@/lib/constants'
@@ -15,26 +15,36 @@ interface Props { weekStart: Date; jobs: Job[] }
 export default function WeekSummaryRow({ weekStart, jobs }: Props) {
   const { theme } = useAppStore()
   const stats = useMemo(() => {
-    const days = weekDays(weekStart)
-    let hours = 0, earned = 0
-    const jobsWorked: Job[] = []
+      const days = weekDays(weekStart)
+      let hours = 0
+      let scheduledEarned = 0
+      let actualEarned = 0
+      let hasActualsAnywhere = false
+      const jobsWorked: Job[] = []
 
-    for (const d of days) {
-      const dk = dateKey(d.getFullYear(), d.getMonth(), d.getDate())
-      for (const j of jobs) {
-        const total = getDayHours(dk, j.id)
-        const night = getNightHours(dk, j.id)
-        const dayH  = total - night
-        const nightRate = j.nightRate || Math.round(j.rate * 1.25)
-        earned += dayH * j.rate + night * nightRate
-        hours  += total
-        if (total > 0 && !jobsWorked.find(jw => jw.id === j.id)) jobsWorked.push(j)
+      for (const d of days) {
+        const dk = dateKey(d.getFullYear(), d.getMonth(), d.getDate())
+        if (hasActualTimes(dk)) hasActualsAnywhere = true
+        scheduledEarned += getDayEarnedScheduled(dk, jobs)
+        actualEarned    += getDayEarnedActual(dk, jobs)
+        for (const j of jobs) {
+          const total = getDayHours(dk, j.id)
+          const night = getNightHours(dk, j.id)
+          hours += total
+          if (total > 0 && !jobsWorked.find(jw => jw.id === j.id)) jobsWorked.push(j)
+        }
       }
-    }
 
-    return { hours, earned: Math.round(earned), jobsWorked }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekStart, jobs])
+      const showActualLine = hasActualsAnywhere && Math.abs(actualEarned - scheduledEarned) > 0.5
+      return {
+        hours,
+        scheduledEarned: Math.round(scheduledEarned),
+        actualEarned: Math.round(actualEarned),
+        showActualLine,
+        jobsWorked,
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [weekStart, jobs])
 
   const limit = CONFIG.WEEKLY_HOUR_LIMIT
   const pct   = Math.min(100, (stats.hours / limit) * 100)
@@ -59,9 +69,19 @@ export default function WeekSummaryRow({ weekStart, jobs }: Props) {
         <span style={{ fontSize: 10, fontWeight: 700, color: barColor }}>
           {formatHours(stats.hours)}/{limit}h
         </span>
-        <span style={{ fontSize: 10, fontWeight: 700, color: '#34d399' }}>
-          {formatYen(stats.earned)}
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#34d399' }}>
+                    {formatYen(stats.scheduledEarned)}
+                  </span>
+                  {stats.showActualLine && (
+                    <span
+                      title="Per-minute actual earnings (actualLogin/actualLogout)"
+                      style={{ fontSize: 8.5, fontWeight: 700, color: 'var(--info)' }}
+                    >
+                      ⏱ {formatYen(stats.actualEarned)}
+                    </span>
+                  )}
+                </div>
         <div style={{ display: 'flex', gap: 3 }}>
           {stats.jobsWorked.map(j => (
             <span key={j.id} style={{
