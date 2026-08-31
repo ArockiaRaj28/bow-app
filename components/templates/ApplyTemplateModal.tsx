@@ -9,6 +9,8 @@ import { useJobsStore } from '@/store/useJobsStore'
 import { dateKey, todayKey, getWeekStart } from '@/lib/dateUtils'
 import { calcShiftHours, calcShiftEarned } from '@/lib/nightPayEngine'
 import { formatHours, formatYen } from '@/lib/timeUtils'
+import { projectWeeksForShifts, getVisaStatusDisplay, type WeekProjection } from '@/features/visa/visaEngine'
+import VisaGuardDialog from '@/components/modals/VisaGuardDialog'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -38,10 +40,10 @@ function fmtShort(dk: string): string {
 }
 
 export default function ApplyTemplateModal() {
-  const { closeModal, modalDateKey: tmplId } = useAppStore()
-  const { templates, fetchTemplatesFromDB, apiReady } = useTemplatesStore()
-  const { shifts, addShiftsToDB, syncShiftsFromDB } = useShiftsStore()
-  const { jobs } = useJobsStore()
+  const { closeModal, modalDateKey: tmplId, visaGuardEnabled } = useAppStore()
+    const { templates, fetchTemplatesFromDB, apiReady } = useTemplatesStore()
+    const { shifts, addShiftsToDB, syncShiftsFromDB } = useShiftsStore()
+    const { jobs } = useJobsStore()
 
   // Ensure templates are loaded (modal can open before the Templates tab is visited)
   useEffect(() => {
@@ -121,12 +123,38 @@ export default function ApplyTemplateModal() {
 
   const canSave = !!template && selectedDates.length > 0 && !saving
 
-  const handleSave = async () => {
-    if (!canSave || !template) return
-    setSaving(true)
-    setErrorMsg(null)
-    try {
-      await addShiftsToDB(
+    // ── Smart visa guard: project affected weeks for the pending shifts ──
+    const guardWeeks = useMemo<WeekProjection[]>(() => {
+      if (!template || selectedDates.length === 0) return []
+      const pending = selectedDates.map((dk) => ({
+        date: dk, jobId: template.jobId, start: template.start, end: template.end,
+      }))
+      return projectWeeksForShifts(pending, jobs)
+    }, [template, selectedDates, jobs])
+    const worstGuard: WeekProjection['status'] = visaGuardEnabled
+        ? guardWeeks.reduce<'safe' | 'near' | 'over'>(
+            (w, x) => (x.status === 'over' ? 'over' : x.status === 'near' && w === 'safe' ? 'near' : w),
+            'safe'
+          )
+        : 'safe'
+      const [guardOpen, setGuardOpen] = useState(false)
+
+    const handleSave = async () => {
+      if (!canSave || !template) return
+      if (worstGuard !== 'safe' && guardWeeks.some((w) => w.addedHours > 0)) {
+        setGuardOpen(true)
+        return
+      }
+      await doSave()
+    }
+
+    const doSave = async () => {
+        setGuardOpen(false)
+        if (!template) return
+        setSaving(true)
+        setErrorMsg(null)
+        try {
+        await addShiftsToDB(
         selectedDates.map(dk => ({
           date: dk,
           jobId: template.jobId,
@@ -148,16 +176,32 @@ export default function ApplyTemplateModal() {
   }
 
   return (
-    <Modal
-      title={`📅 Apply: ${template?.name || 'Template'}`}
-      footer={
-        <div style={{ display: 'flex', gap: 10, width: '100%', alignItems: 'center' }}>
-          <div style={{ flex: 1, fontSize: 11, color: 'var(--muted)' }}>
-            {selectedDates.length === 0
-              ? 'Pick at least one date.'
-              : <>Will add <b style={{ color: 'var(--text)' }}>{selectedDates.length}</b> shift{selectedDates.length !== 1 ? 's' : ''}</>
-            }
-          </div>
+      <>
+      {guardOpen && worstGuard !== 'safe' && (
+        <VisaGuardDialog
+          weeks={guardWeeks}
+          onConfirm={() => { void doSave() }}
+          onCancel={() => setGuardOpen(false)}
+        />
+      )}
+      <Modal
+        title={`📅 Apply: ${template?.name || 'Template'}`}
+        footer={
+          <div style={{ display: 'flex', gap: 10, width: '100%', alignItems: 'center' }}>
+            <div style={{ flex: 1, fontSize: 11, color: 'var(--muted)' }}>
+              {worstGuard !== 'safe' && guardWeeks.length > 0 ? (() => {
+                const worstWeek = guardWeeks.reduce((a, b) => (b.projectedHours >= a.projectedHours ? b : a))
+                return (
+                  <span style={{ color: getVisaStatusDisplay(worstGuard).color, fontWeight: 700 }}>
+                    ⚠ {formatHours(worstWeek.projectedHours)}/28h ·{' '}
+                  </span>
+                )
+              })() : null}
+              {selectedDates.length === 0
+                ? 'Pick at least one date.'
+                : <>Will add <b style={{ color: 'var(--text)' }}>{selectedDates.length}</b> shift{selectedDates.length !== 1 ? 's' : ''}</>
+              }
+            </div>
           <button onClick={closeModal} style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.08)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text)' }}>Cancel</button>
           <button
             onClick={handleSave}
@@ -342,8 +386,9 @@ export default function ApplyTemplateModal() {
         </div>
       )}
     </Modal>
-  )
-}
+        </>
+      )
+    }
 
 function PillBtn({ onClick, children, active }: { onClick: () => void; children: React.ReactNode; active?: boolean }) {
   return (

@@ -28,15 +28,20 @@ import { useTemplatesStore } from '@/store/useTemplatesStore'
 import { AuthUser } from '@/lib/auth/session'
 
 export default function AppShell({ user }: { user: AuthUser }) {
-  const { activeTab, openModal, fabExpanded, hydratePerMinutePay } = useAppStore()
-  const { syncShiftsFromDB } = useShiftsStore()
-  const { fetchJobsFromDB } = useJobsStore()
-  const { fetchTemplatesFromDB } = useTemplatesStore()
+  const { activeTab, openModal, fabExpanded, hydratePerMinutePay, hydrateVisaGuard } = useAppStore()
+    const { syncShiftsFromDB } = useShiftsStore()
+    const { fetchJobsFromDB } = useJobsStore()
+    const { fetchTemplatesFromDB } = useTemplatesStore()
 
-  // Hydrate the per-minute toggle from the server (User.actualTimesEnabled).
-  useEffect(() => {
-    hydratePerMinutePay(user.actualTimesEnabled)
-  }, [hydratePerMinutePay, user.actualTimesEnabled])
+    // Hydrate the per-minute toggle from the server (User.actualTimesEnabled).
+    useEffect(() => {
+      hydratePerMinutePay(user.actualTimesEnabled)
+    }, [hydratePerMinutePay, user.actualTimesEnabled])
+
+    // Hydrate the visa-guard toggle from the server (User.visaGuardEnabled).
+    useEffect(() => {
+      hydrateVisaGuard(user.visaGuardEnabled)
+    }, [hydrateVisaGuard, user.visaGuardEnabled])
 
   // Hydrate jobs, templates, and shifts from DB on boot.
     useEffect(() => {

@@ -49,7 +49,7 @@ export default function AccountView({ user }: { user: AuthUser }) {
   const [isResending, startResend] = useTransition()
   const isVerified = !!user.emailVerified
 
-  const { perMinutePay, setPerMinutePay } = useAppStore()
+  const { perMinutePay, setPerMinutePay, visaGuardEnabled, setVisaGuard } = useAppStore()
 
   // ── Draft state (initialised from props) ──
   const [name, setName] = useState(user.name)
@@ -92,6 +92,15 @@ export default function AccountView({ user }: { user: AuthUser }) {
       toast.error(res.error || 'Failed to save preference')
     } else {
       toast.success(next ? 'Per-minute pay enabled' : 'Per-minute pay disabled')
+    }
+  }
+
+  const handleToggleVisaGuard = async (next: boolean) => {
+    const res = await setVisaGuard(next)
+    if (!res.success) {
+      toast.error(res.error || 'Failed to save preference')
+    } else {
+      toast.success(next ? 'Visa guard warnings enabled' : 'Visa guard warnings disabled')
     }
   }
 
@@ -361,11 +370,22 @@ export default function AccountView({ user }: { user: AuthUser }) {
             label="Per-Minute Pay"
             icon="⏱️"
             description="Use exact clock in/out times for precision"
-            last
           >
             <ToggleSwitch
               checked={perMinutePay}
               onChange={(next) => { void handleTogglePerMinute(next) }}
+            />
+          </HorizontalRow>
+
+          <HorizontalRow
+            label="Visa Guard Warnings"
+            icon="🛡️"
+            description="Warn before saving shifts that push a week near or over 28h"
+            last
+          >
+            <ToggleSwitch
+              checked={visaGuardEnabled}
+              onChange={(next) => { void handleToggleVisaGuard(next) }}
             />
           </HorizontalRow>
         </div>

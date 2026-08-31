@@ -9,6 +9,8 @@ import { useTemplatesStore } from '@/store/useTemplatesStore'
 import { dateKey, todayKey, getWeekStart } from '@/lib/dateUtils'
 import { calcShiftHours, calcShiftEarned } from '@/lib/nightPayEngine'
 import { formatHours, formatYen } from '@/lib/timeUtils'
+import { projectWeeksForShifts, getVisaStatusDisplay, type WeekProjection } from '@/features/visa/visaEngine'
+import VisaGuardDialog from '@/components/modals/VisaGuardDialog'
 
 type Source = 'template' | 'custom'
 type ConflictPolicy = 'skip' | 'append'
@@ -54,6 +56,7 @@ export default function ShiftEntryModal() {
   const { jobs } = useJobsStore()
   const { shifts, addShiftsToDB, syncShiftsFromDB } = useShiftsStore()
   const { templates, fetchTemplatesFromDB, apiReady } = useTemplatesStore()
+  const { visaGuardEnabled } = useAppStore()
 
   // Templates may not be loaded yet if user opens FAB before Templates tab.
   useEffect(() => {
@@ -206,9 +209,37 @@ export default function ShiftEntryModal() {
   const previewHrs = useMemo(() => calcShiftHours(previewShift), [previewShift])
   const previewEarn = previewJob ? calcShiftEarned(previewShift, previewJob) : 0
 
+  // ── Smart visa guard: project affected weeks for the pending shifts ──
+  const guardWeeks = useMemo<WeekProjection[]>(() => {
+    if (preview.length === 0) return []
+    const pending = preview
+      .filter((p) => !(p.wouldConflict && conflictPolicy === 'skip'))
+      .filter((p) => (shifts[p.dk]?.length ?? 0) < MAX_SHIFTS_PER_DAY)
+      .map((p) => ({ date: p.dk, jobId: previewShift.jobId, start: previewShift.start, end: previewShift.end }))
+    return projectWeeksForShifts(pending, jobs)
+  }, [preview, conflictPolicy, shifts, previewShift, jobs])
+  const worstGuard: WeekProjection['status'] = visaGuardEnabled
+    ? guardWeeks.reduce<'safe' | 'near' | 'over'>(
+        (w, x) => (x.status === 'over' ? 'over' : x.status === 'near' && w === 'safe' ? 'near' : w),
+        'safe'
+      )
+    : 'safe'
+  const [guardOpen, setGuardOpen] = useState(false)
+
   // ── Save handler ─────────────────────────────────────────────
   const handleSave = async () => {
     if (!canSave) return
+    // Smart visa guard: intercept first save attempt when any affected week
+    // reaches 24h+ (near) or 28h+ (over) — user can always choose "Add anyway".
+    if (worstGuard !== 'safe' && guardWeeks.some((w) => w.addedHours > 0)) {
+      setGuardOpen(true)
+      return
+    }
+    await doSave()
+  }
+
+  const doSave = async () => {
+    setGuardOpen(false)
     setSaving(true)
     setErrorMsg(null)
     try {
@@ -258,11 +289,27 @@ export default function ShiftEntryModal() {
   }
 
   // ── Render ───────────────────────────────────────────────────
-  return (
-    <Modal title="📅 Apply Shifts" footer={
-      <div style={{ display: 'flex', gap: 10, width: '100%', alignItems: 'center' }}>
-        <div style={{ flex: 1, fontSize: 11, color: 'var(--muted)' }}>
-          {selectedDates.length === 0 ? (
+    return (
+      <>
+      {guardOpen && worstGuard !== 'safe' && (
+        <VisaGuardDialog
+          weeks={guardWeeks}
+          onConfirm={() => { void doSave() }}
+          onCancel={() => setGuardOpen(false)}
+        />
+      )}
+      <Modal title="📅 Apply Shifts" footer={
+        <div style={{ display: 'flex', gap: 10, width: '100%', alignItems: 'center' }}>
+          <div style={{ flex: 1, fontSize: 11, color: 'var(--muted)' }}>
+            {worstGuard !== 'safe' && guardWeeks.length > 0 ? (() => {
+                          const worstWeek = guardWeeks.reduce((a, b) => (b.projectedHours >= a.projectedHours ? b : a))
+                          return (
+                            <span style={{ color: getVisaStatusDisplay(worstGuard).color, fontWeight: 700 }}>
+                              ⚠ {formatHours(worstWeek.projectedHours)}/28h ·{' '}
+                            </span>
+                          )
+                        })() : null}
+            {selectedDates.length === 0 ? (
             'Pick at least one date.'
           ) : (
             <>
@@ -552,8 +599,9 @@ export default function ShiftEntryModal() {
         </div>
       )}
     </Modal>
-  )
-}
+        </>
+      )
+    }
 
 // ── Sub-components ──────────────────────────────────────────────
 const L: React.CSSProperties = {

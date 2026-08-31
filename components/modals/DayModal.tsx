@@ -26,7 +26,7 @@ import DayTimeline from './DayTimeline'
 type FormMode = 'add' | 'edit'
 
 export default function DayModal() {
-  const { modalDateKey: dk, closeModal, setModal, perMinutePay } = useAppStore()
+  const { modalDateKey: dk, closeModal, setModal, perMinutePay, visaGuardEnabled } = useAppStore()
   const { jobs } = useJobsStore()
   const { shifts, addShift, updateShift, deleteShift: deleteShiftStore, updateActualTimes, recalculateDayHours } = useShiftsStore()
   const { templates } = useTemplatesStore()
@@ -201,9 +201,22 @@ export default function DayModal() {
         fontSize: 11, color: 'var(--muted)',
       }}>
         <span>Week: <strong style={{ color: 'var(--text)' }}>{formatHours(weekTotal)}/28h</strong></span>
-        <span>Remaining: <strong style={{ color: 'var(--green2)' }}>{formatHours(remaining)}</strong></span>
-        <span>Earned: <strong style={{ color: 'var(--green2)' }}>{formatYen(Math.round(weekEarned))}</strong></span>
-      </div>
+                <span>Remaining: <strong style={{ color: 'var(--green2)' }}>{formatHours(remaining)}</strong></span>
+                <span>Earned: <strong style={{ color: 'var(--green2)' }}>{formatYen(Math.round(weekEarned))}</strong></span>
+              </div>
+
+              {/* Proactive "near" visa warning: projected week total ≥24h but ≤28h */}
+              {visaGuardEnabled &&
+                            (weekTotal + previewHrs.total) >= CONFIG.WEEK_NEAR_THRESHOLD &&
+                             (weekTotal + previewHrs.total) <= CONFIG.WEEKLY_HOUR_LIMIT && (
+                <div style={{
+                  background: 'rgba(245,158,11,0.09)', border: '1px solid rgba(245,158,11,0.3)',
+                  borderRadius: 8, padding: '7px 12px', marginBottom: 12,
+                  fontSize: 11, color: '#fbbf24', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  <span>⚡</span> This shift brings the week to {formatHours(weekTotal + previewHrs.total)}/28h — close to the visa limit.
+                </div>
+              )}
 
       {/* Existing shifts */}
       <DayShiftsList

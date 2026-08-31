@@ -14,9 +14,10 @@ export type AuthUser = {
   location: string | null
   schoolFee: number
   emailVerified: Date | null
-  actualTimesEnabled: boolean
-  role: 'USER' | 'ADMIN'
-}
+    actualTimesEnabled: boolean
+    visaGuardEnabled: boolean
+    role: 'USER' | 'ADMIN'
+  }
 
 export function hashToken(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex')
@@ -92,8 +93,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
           location: true,
           schoolFee: true,
           emailVerified: true,
-          actualTimesEnabled: true,
-          role: true,
+                    actualTimesEnabled: true,
+                    visaGuardEnabled: true,
+                    role: true,
         },
       },
     },

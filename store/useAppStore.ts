@@ -34,9 +34,13 @@ interface AppState {
    *  on session load by AppShell; replaces the local-only mirror. */
   hydratePerMinutePay: (enabled: boolean) => void
   /** Flip the toggle locally and persist to the server. The returned
-   *  Promise resolves with the persistent value (or an error message). */
-  setPerMinutePay: (val: boolean) => Promise<{ success: boolean; error?: string }>
-}
+     *  Promise resolves with the persistent value (or an error message). */
+    setPerMinutePay: (val: boolean) => Promise<{ success: boolean; error?: string }>
+    // Visa guard — mirrors User.visaGuardEnabled (default true).
+    visaGuardEnabled: boolean
+    hydrateVisaGuard: (enabled: boolean) => void
+    setVisaGuard: (val: boolean) => Promise<{ success: boolean; error?: string }>
+  }
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -48,7 +52,8 @@ export const useAppStore = create<AppState>()(
       modalDateKey: null,
       fabExpanded: false,
       theme: 'midnight',
-      perMinutePay: false,
+            perMinutePay: false,
+            visaGuardEnabled: true,
 
       setTab: (tab) => set({ activeTab: tab }),
 
@@ -82,6 +87,24 @@ export const useAppStore = create<AppState>()(
       collapseFAB: () => set({ fabExpanded: false }),
 
       hydratePerMinutePay: (enabled) => set({ perMinutePay: !!enabled }),
+
+      hydrateVisaGuard: (enabled) => set({ visaGuardEnabled: !!enabled }),
+
+      setVisaGuard: async (val) => {
+        const next = !!val
+        set({ visaGuardEnabled: next })
+        try {
+          const { setVisaGuardEnabled } = await import('@/app/actions/account')
+          const res = await setVisaGuardEnabled(next)
+          if (!res.success) {
+            return { success: false, error: res.error || 'Failed to save preference.' }
+          }
+          return { success: true }
+        } catch (err) {
+          console.error('[useAppStore.setVisaGuard] server action failed', err)
+          return { success: false, error: (err as Error).message }
+        }
+      },
 
       setPerMinutePay: async (val) => {
         const next = !!val

@@ -155,6 +155,25 @@ export async function setActualTimesEnabled(enabled: boolean): Promise<{ success
     return { success: true, enabled: !!enabled }
   } catch (err) {
     console.error('[setActualTimesEnabled] update failed', err)
-    return { success: false, error: 'Failed to save preference.' }
-  }
-}
+        return { success: false, error: 'Failed to save preference.' }
+      }
+    }
+
+    /** Persist the user's preference for smart visa-guard warnings.
+     *  Stored on `User.visaGuardEnabled` (default true); when off the guard
+     *  chip + dialog never render, but the VisaBar is always unchanged. */
+    export async function setVisaGuardEnabled(enabled: boolean): Promise<{ success: boolean; enabled?: boolean; error?: string }> {
+      const user = await getCurrentUser()
+      if (!user) return { success: false, error: 'Not authenticated.' }
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { visaGuardEnabled: !!enabled },
+        })
+        revalidatePath('/dashboard')
+        return { success: true, enabled: !!enabled }
+      } catch (err) {
+        console.error('[setVisaGuardEnabled] update failed', err)
+        return { success: false, error: 'Failed to save preference.' }
+      }
+    }

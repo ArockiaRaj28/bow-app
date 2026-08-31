@@ -29,6 +29,7 @@ model User {
   schoolFee           Int                  @default(840000) @map("school_fee")
   emailVerified       DateTime?            @map("email_verified") @db.Timestamptz(6)
   actualTimesEnabled  Boolean              @default(false) @map("actual_times_enabled")
+  visaGuardEnabled    Boolean              @default(true) @map("visa_guard_enabled")
   // Default USER keeps existing rows backward-compatible. New columns
   // with defaults are non-destructive in `db push`, and the migration
   // baseline captures them explicitly.
