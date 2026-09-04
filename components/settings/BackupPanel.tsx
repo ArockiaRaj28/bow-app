@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
 import { exportData } from '@/services/exportService'
 import { importData, type ImportResult } from '@/services/importService'
+import { previewImport, type ImportPreview } from '@/app/actions/backup'
 
 type PanelMode = 'export' | 'import'
 type Format = 'json' | 'csv'
@@ -14,11 +15,17 @@ export default function BackupPanel() {
   const [importMode, setImportMode] = useState<'replace' | 'merge'>('merge')
   const [step, setStep] = useState<'format' | 'preview' | 'done'>('format')
   const [preview, setPreview] = useState<ImportResult | null>(null)
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [replaceConfirmed, setReplaceConfirmed] = useState(false)
   const [loading, setLoading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const [pickedFile, setPickedFile] = useState<File | null>(null)
 
-  const close = () => { setMode(null); setStep('format'); setPreview(null); setPickedFile(null) }
+  const close = () => {
+    setMode(null); setStep('format'); setPreview(null); setPickedFile(null)
+    setImportPreview(null); setReplaceConfirmed(false)
+  }
 
   const handleExport = async () => {
     setLoading(true)
@@ -34,18 +41,41 @@ export default function BackupPanel() {
   }
 
   const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    if (!f) return
-    if (f.size > 25_000_000) {
-      toast.error('File too large (>25 MB)')
+      const f = e.target.files?.[0]
+      if (!f) return
+      if (f.size > 25_000_000) {
+        toast.error('File too large (>25 MB)')
+        e.target.value = ''
+        return
+      }
+      setPickedFile(f)
+      setFormat('auto' as Format) // let importer sniff
+      setStep('preview')
+      void runPreview(f, importMode)
       e.target.value = ''
-      return
     }
-    setPickedFile(f)
-    setFormat('auto' as Format) // let importer sniff
-    setStep('preview')
-    e.target.value = ''
-  }
+
+    // Recompute the diff whenever the import mode or file changes.
+    const runPreview = async (file: File, mode: 'replace' | 'merge') => {
+      setPreviewLoading(true)
+      setReplaceConfirmed(false)
+      try {
+        const res = await previewImport(file, mode)
+        setImportPreview(res)
+      } catch (err) {
+        toast.error((err as Error).message || 'Preview failed')
+        setImportPreview(null)
+      } finally {
+        setPreviewLoading(false)
+      }
+    }
+
+    useEffect(() => {
+      if (step === 'preview' && pickedFile) {
+        void runPreview(pickedFile, importMode)
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [importMode])
 
   const handleImport = async () => {
     if (!pickedFile) return
@@ -185,51 +215,146 @@ export default function BackupPanel() {
               )}
 
               {mode === 'import' && step === 'preview' && pickedFile && (
-                <>
-                  <div style={label}>Import mode</div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    {(['merge', 'replace'] as const).map((m) => (
-                      <div
-                        key={m}
-                        onClick={() => setImportMode(m)}
-                        style={{
-                          ...cardStyle,
-                          borderColor: importMode === m ? 'var(--accent)' : 'var(--border)',
-                          background: importMode === m ? 'rgba(59,130,246,0.08)' : 'var(--card)',
-                        }}
-                      >
-                        <div style={{ fontWeight: 700, fontSize: 13 }}>
-                          {m === 'replace' ? 'Replace' : 'Merge'}
-                        </div>
-                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                          {m === 'replace'
-                            ? 'Wipe existing, then import'
-                            : 'Keep existing, add new'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                              <>
+                                <div style={label}>Import mode</div>
+                                <div style={{ display: 'flex', gap: 10 }}>
+                                  {(['merge', 'replace'] as const).map((m) => (
+                                    <div
+                                      key={m}
+                                      onClick={() => setImportMode(m)}
+                                      style={{
+                                        ...cardStyle,
+                                        borderColor: importMode === m
+                                          ? (m === 'replace' ? 'var(--red)' : 'var(--accent)')
+                                          : 'var(--border)',
+                                        background: importMode === m
+                                          ? (m === 'replace' ? 'rgba(239,68,68,0.10)' : 'rgba(59,130,246,0.08)')
+                                          : 'var(--card)',
+                                      }}
+                                    >
+                                      <div style={{ fontWeight: 700, fontSize: 13 }}>
+                                        {m === 'replace' ? 'Replace' : 'Merge'}
+                                      </div>
+                                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                                        {m === 'replace'
+                                          ? 'Wipe existing, then import'
+                                          : 'Keep existing, add new'}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
 
-                  <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)' }}>
-                    <div>📄 {pickedFile.name} ({(pickedFile.size / 1024).toFixed(1)} KB)</div>
-                    <div>📦 Format: {pickedFile.name.endsWith('.csv') ? 'CSV' : 'JSON'}</div>
-                  </div>
+                                <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)' }}>
+                                  <div>📄 {pickedFile.name} ({(pickedFile.size / 1024).toFixed(1)} KB)</div>
+                                  {importPreview?.backup.schemaVersion && (
+                                    <div>📦 Schema v{importPreview.backup.schemaVersion}
+                                      {importPreview.backup.exportedAt && <> · exported {new Date(importPreview.backup.exportedAt).toLocaleDateString()}</>}
+                                    </div>
+                                  )}
+                                </div>
 
-                  {importMode === 'replace' && (
-                    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', fontSize: 11, color: 'var(--red)' }}>
-                      ⚠️ Existing data will be replaced. Expenses & notes for months in this backup are scoped; jobs/goals are all-time.
-                    </div>
-                  )}
+                                {/* ── Diff preview ─────────────────────── */}
+                                {previewLoading ? (
+                                  <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)' }}>
+                                    Comparing with your current data…
+                                  </div>
+                                ) : importPreview ? (
+                                  <>
+                                    {importPreview.blockers.length > 0 && (
+                                      <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', fontSize: 11, color: 'var(--red)', lineHeight: 1.5 }}>
+                                        {importPreview.blockers.map((b, i) => <div key={i}>• {b}</div>)}
+                                      </div>
+                                    )}
 
-                  <button
-                    onClick={handleImport}
-                    disabled={loading}
-                    style={{ ...primaryBtn, marginTop: 16, width: '100%' }}
-                  >
-                    {loading ? 'Importing…' : `Import (${importMode})`}
-                  </button>
-                </>
-              )}
+                                    <div style={{ marginTop: 12, borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
+                                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+                                        <thead>
+                                          <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                            <th style={thStyle}>Domain</th>
+                                            <th style={thStyle}>In backup</th>
+                                            <th style={thStyle}>You have</th>
+                                            {importMode === 'replace' && <th style={thStyle}>Will remove</th>}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {[
+                                            ['Jobs', importPreview.backup.counts.jobs, importPreview.current.jobs],
+                                            ['Templates', importPreview.backup.counts.templates, importPreview.current.templates],
+                                            ['Shifts', importPreview.backup.counts.shifts, importPreview.current.shifts],
+                                            ['Categories', importPreview.backup.counts.categories, importPreview.current.categories],
+                                            ['Expenses', importPreview.backup.counts.expenses, importPreview.current.expenses],
+                                            ['Goals', importPreview.backup.counts.goals, importPreview.current.goals],
+                                            ['Notes months', importPreview.backup.counts.notes, importPreview.current.notes],
+                                          ].map(([label, inB, have]) => (
+                                            <tr key={label as string} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                                              <td style={tdStyle}>{label}</td>
+                                              <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 600 }}>{inB as number}</td>
+                                              <td style={{ ...tdStyle, textAlign: 'center' }}>{have as number}</td>
+                                              {importMode === 'replace' && (
+                                                <td style={{ ...tdStyle, textAlign: 'center', color: (have as number) > 0 ? 'var(--red)' : 'var(--muted)', fontWeight: 600 }}>
+                                                  {have as number > 0 ? (have as number) : '—'}
+                                                </td>
+                                              )}
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+
+                                    {importPreview.danglingReferences.length > 0 && (
+                                      <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6, background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.25)', fontSize: 10.5, color: 'var(--yellow)', lineHeight: 1.5 }}>
+                                        ⚠️ {importPreview.danglingReferences.length} dangling reference{importPreview.danglingReferences.length > 1 ? 's' : ''} (will be skipped):{' '}
+                                        {importPreview.danglingReferences.slice(0, 3).join(' · ')}
+                                        {importPreview.danglingReferences.length > 3 && ` · +${importPreview.danglingReferences.length - 3} more`}
+                                      </div>
+                                    )}
+
+                                    {importPreview.warnings.length > 0 && (
+                                      <div style={{ marginTop: 8, fontSize: 10.5, color: 'var(--muted)' }}>
+                                        {importPreview.warnings.map((w, i) => <div key={i}>ℹ️ {w}</div>)}
+                                      </div>
+                                    )}
+
+                                    {importMode === 'replace' && (
+                                      <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', fontSize: 11, color: 'var(--red)', lineHeight: 1.5 }}>
+                                        ⚠️ Replace will <strong>wipe {importPreview.current.jobs} jobs, {importPreview.current.shifts} shifts, {importPreview.current.expenses} expenses</strong> and more before inserting the backup.
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)' }}>
+                                    Select a file to preview what will change.
+                                  </div>
+                                )}
+
+                                {importMode === 'replace' && importPreview && importPreview.blockers.length === 0 && (
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 12, color: 'var(--text)', cursor: 'pointer' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={replaceConfirmed}
+                                      onChange={(e) => setReplaceConfirmed(e.target.checked)}
+                                      style={{ accentColor: 'var(--red)' }}
+                                    />
+                                    I understand my current data will be wiped
+                                  </label>
+                                )}
+
+                                <button
+                                  onClick={handleImport}
+                                  disabled={loading || previewLoading || (importMode === 'replace' && (!replaceConfirmed || (importPreview?.blockers.length ?? 0) > 0)) || (importPreview?.blockers.length ?? 0) > 0}
+                                  style={{
+                                    ...primaryBtn,
+                                    marginTop: 16,
+                                    width: '100%',
+                                    background: importMode === 'replace'
+                                      ? 'linear-gradient(135deg, rgba(239,68,68,0.9) 0%, #b91c1c 100%)'
+                                      : undefined,
+                                  }}
+                                >
+                                  {loading ? 'Importing…' : `Import (${importMode})`}
+                                </button>
+                              </>
+                            )}
 
               {mode === 'import' && step === 'done' && preview && (
                 <div style={{ fontSize: 12, lineHeight: 1.8 }}>
@@ -321,4 +446,12 @@ const primaryBtn: React.CSSProperties = {
   background: 'var(--accent)', color: '#fff',
   border: 'none', borderRadius: 8, padding: '10px 16px',
   fontSize: 13, fontWeight: 600, cursor: 'pointer',
+}
+const thStyle: React.CSSProperties = {
+  padding: '8px 10px', textAlign: 'center',
+  fontSize: 10, fontWeight: 700, color: 'var(--muted)',
+  textTransform: 'uppercase', letterSpacing: '0.4px',
+}
+const tdStyle: React.CSSProperties = {
+  padding: '7px 10px', color: 'var(--text)', fontSize: 12,
 }

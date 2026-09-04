@@ -63,6 +63,77 @@ function looksLikeCsv(text: string): boolean {
   return first.startsWith('# section:') || first.split(',').length >= 3
 }
 
+/**
+ * Shared parser used by both `importData` (writes to DB) and the
+ * dry-run preview action. Returns the normalised BackupData shape
+ * plus any parse-time warnings (v6.3 → v6.4 conversion notices).
+ *
+ * Throws a descriptive Error for unrecoverable parse failures —
+ * the UI surfaces the message verbatim so the user can fix their
+ * backup file.
+ */
+export interface ParseBackupResult {
+  data: Partial<BackupData>
+  warnings: string[]
+  format: 'json' | 'csv'
+  schemaVersion: string | null
+  exportedAt: string | null
+}
+
+export function parseBackupToObject(
+  text: string,
+  detected: 'json' | 'csv' | 'auto' = 'auto'
+): ParseBackupResult {
+  const fmt: 'json' | 'csv' =
+    detected === 'auto' ? (looksLikeCsv(text) ? 'csv' : 'json') : detected
+
+  let data: Partial<BackupData>
+  const warnings: string[] = []
+
+  if (fmt === 'csv') {
+    data = csvSectionsToBackupData(text)
+  } else {
+    try {
+      data = JSON.parse(text) as Partial<BackupData>
+    } catch (err) {
+      throw new Error(`JSON parse failed: ${(err as Error).message}. Did you mean CSV?`)
+    }
+    if (!data || typeof data !== 'object' || (!data.jobs && !data.shifts)) {
+      throw new Error('Invalid backup: missing jobs and shifts.')
+    }
+  }
+
+  // Version tolerance — mirrors what importData does so preview +
+  // import agree on what's acceptable.
+  const version = (data.schemaVersion ?? '6.3.0') as string
+  if (version !== '6.3.0' && version !== '6.4.0') {
+    throw new Error(`Backup file version (${version}) is too new. Update the app.`)
+  }
+  if (version === '6.3.0' && !data.shifts && (data as any).entries) {
+    warnings.push('v6.3 entries-only backup — shifts synthesised, times are lossy.')
+  }
+
+  // Normalise shifts so both v6.3 + v6.4 collapse to a single dict.
+  if (data.shifts && typeof data.shifts !== 'string' && !Array.isArray(data.shifts)) {
+    data.shifts = normalizeShiftsShape(data.shifts as unknown as Record<string, unknown>) as any
+  }
+
+  // v6.3 entries → synthesised shifts (only when no real shifts present).
+  const rawEntries = (data as any).entries as unknown[] | undefined
+  const hadShifts = !!(data.shifts && Object.keys(data.shifts).length > 0)
+  if (!hadShifts && Array.isArray(rawEntries)) {
+    ;(data as any).shifts = synthShiftsFromEntries(rawEntries)
+  }
+
+  return {
+    data,
+    warnings,
+    format: fmt,
+    schemaVersion: version,
+    exportedAt: data.exportedAt ?? null,
+  }
+}
+
 // ── Normalisers ────────────────────────────────────────────
 
 function normalizeName(input: string): string {
@@ -204,11 +275,9 @@ export async function importData(
   }
 
   const text = await file.text()
-  const detected: 'json' | 'csv' =
-    format === 'auto' ? (looksLikeCsv(text) ? 'csv' : 'json') : format
-
-  let data: Partial<BackupData>
-  const warnings: string[] = []
+  const parsed = parseBackupToObject(text, format)
+  const data = parsed.data
+  const warnings = [...parsed.warnings]
   const failures: string[] = []
 
   function pushFailure(domain: string, ctx: string, err: unknown) {
@@ -220,53 +289,19 @@ export async function importData(
     }
   }
 
-  if (detected === 'csv') {
-    data = csvSectionsToBackupData(text)
-  } else {
-    try {
-      data = JSON.parse(text) as Partial<BackupData>
-    } catch (err) {
-      throw new Error(`JSON parse failed: ${(err as Error).message}. Did you mean CSV?`)
-    }
-    if (!data || typeof data !== 'object' || (!data.jobs && !data.shifts)) {
-      throw new Error('Invalid backup: missing jobs and shifts.')
-    }
-  }
-
-  // ── version tolerance ───────────────────────────────────
-  const version = (data.schemaVersion ?? '6.3.0') as string
-  if (version !== '6.3.0' && version !== '6.4.0') {
-    throw new Error(`Backup file version (${version}) is too new. Update the app.`)
-  }
-  if (version === '6.3.0' && !data.shifts && (data as any).entries) {
-    warnings.push('v6.3 entries-only backup — shifts synthesised, times are lossy.')
-  }
-
-  // ── shift normalisation ─────────────────────────────────
-  // Always run before any downstream processing so both v6.3
-  // and v6.4 shapes collapse into a single canonical dict.
-  if (data.shifts && typeof data.shifts !== 'string' && !Array.isArray(data.shifts)) {
-    data.shifts = normalizeShiftsShape(data.shifts as unknown as Record<string, unknown>) as any
-  }
-
-  // Fallback: reconstruct shifts from v6.3 entries[].
+  // Reconstructed shifts from v6.3 entries are surfaced as a warning
+  // so the user can verify on the calendar (times are lossy).
   const rawEntries = (data as any).entries as unknown[] | undefined
-  const hadShifts = !!(data.shifts && Object.keys(data.shifts).length > 0)
-
-  if (!hadShifts && Array.isArray(rawEntries)) {
-    ;(data as any).shifts = synthShiftsFromEntries(rawEntries)
-    const synthResult: Record<string, unknown[]> = (data as any).shifts
-    if (Object.keys(synthResult).length > 0) {
-      warnings.push(
-        `Reconstructed ${Object.keys(synthResult).length} day(s) from v6.3 entries[] — times approximated, verify on calendar.`
-      )
-    }
-    if (rawEntries.length > 0 && Object.keys(synthResult).length === 0) {
-      warnings.push(
-        `Reconstructed 0 day(s) of work-hours from a v6.3 entries[] backup. Times are approximated — verify on the calendar.`
-      )
-    }
-  } else if (!hadShifts) {
+  const synthResult: Record<string, unknown[]> = (data.shifts as any) ?? {}
+  if (Array.isArray(rawEntries) && rawEntries.length > 0 && Object.keys(synthResult).length > 0) {
+    warnings.push(
+      `Reconstructed ${Object.keys(synthResult).length} day(s) from v6.3 entries[] — times approximated, verify on calendar.`
+    )
+  } else if (Array.isArray(rawEntries) && rawEntries.length > 0 && Object.keys(synthResult).length === 0) {
+    warnings.push(
+      `Reconstructed 0 day(s) of work-hours from a v6.3 entries[] backup. Times are approximated — verify on the calendar.`
+    )
+  } else if (!data.shifts || Object.keys(data.shifts as any).length === 0) {
     warnings.push('Backup contains no shift data.')
   }
 
@@ -611,7 +646,7 @@ export async function importData(
     notes: notesInserted,
     entries: Array.isArray(rawEntries) ? rawEntries.length : 0,
     mode,
-    format: detected,
+    format: parsed.format,
     warnings,
     failures,
   }

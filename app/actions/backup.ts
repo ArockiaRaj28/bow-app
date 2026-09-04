@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/session'
 import { prisma } from '@/lib/auth/prisma'
 import type { BackupData, Job, Template, BudgetCategory, Expense, BudgetGoal, Shift } from '@/types'
 import { BACKUP_SCHEMA_VERSION } from '@/lib/backupSchema'
+import { parseBackupToObject } from '@/services/importService'
 
 /**
  * Backup server actions (v6.4).
@@ -349,4 +350,198 @@ function buildCsvText(data: BackupData): string {
   parts.push('')
 
   return parts.join('\n')
-}
+  }
+
+  // ── Import preview / dry-run ────────────────────────────────────────
+
+  /** Per-domain row counts. Generic so it's reused for backup, current,
+   *  and diff shapes. */
+  export type DomainCounts = {
+    jobs: number
+    templates: number
+    shifts: number
+    categories: number
+    expenses: number
+    goals: number
+    notes: number
+    entries: number
+  }
+
+  export interface ImportPreview {
+    mode: 'replace' | 'merge'
+    format: 'json' | 'csv'
+    backup: {
+      fileName: string
+      fileSizeBytes: number
+      schemaVersion: string | null
+      exportedAt: string | null
+      counts: DomainCounts
+    }
+    current: DomainCounts
+    diff: {
+      /** Rows this import would remove from the user's current data. */
+      willRemove: DomainCounts
+      /** Rows this import would insert. */
+      willInsert: DomainCounts
+    }
+    /** Rows in the backup whose jobId / categoryId can't be resolved. */
+    danglingReferences: string[]
+    /** Errors that prevent import — surfaced before the user can proceed. */
+    blockers: string[]
+    /** Non-fatal notices (e.g. v6.3 → v6.4 times approximation). */
+    warnings: string[]
+  }
+
+  function countShifts(shifts: BackupData['shifts'] | undefined): number {
+    if (!shifts) return 0
+    if (Array.isArray(shifts)) return shifts.length
+    if (typeof shifts === 'string') return 0
+    const asMap = shifts as unknown as Record<string, unknown[]>
+    return Object.values(asMap).reduce(
+      (sum, day) => sum + (Array.isArray(day) ? day.length : 0),
+      0,
+    )
+  }
+
+  /**
+   * Parse a backup file and diff it against the user's current data —
+   * WITHOUT writing anything. Used by the BackupPanel's preview step so
+   * the user sees exactly what "Replace" will remove before committing.
+   */
+  export async function previewImport(
+    file: { name: string; size: number; text(): Promise<string> },
+    mode: 'replace' | 'merge'
+  ): Promise<ImportPreview> {
+    const userId = await requireUserId()
+
+    const emptyCounts = (): DomainCounts => ({
+      jobs: 0, templates: 0, shifts: 0, categories: 0, expenses: 0, goals: 0, notes: 0, entries: 0,
+    })
+
+    if (file.size > 25_000_000) {
+      return {
+        mode,
+        format: file.name.endsWith('.csv') ? 'csv' : 'json',
+        backup: { fileName: file.name, fileSizeBytes: file.size, schemaVersion: null, exportedAt: null, counts: emptyCounts() },
+        current: emptyCounts(),
+        diff: { willRemove: emptyCounts(), willInsert: emptyCounts() },
+        danglingReferences: [],
+        blockers: [`Backup file too large (${Math.round(file.size / 1024 / 1024)} MB > 25 MB).`],
+        warnings: [],
+      }
+    }
+
+    const text = await file.text()
+    let parsed
+    try {
+      parsed = parseBackupToObject(text, 'auto')
+    } catch (err) {
+      return {
+        mode,
+        format: file.name.endsWith('.csv') ? 'csv' : 'json',
+        backup: { fileName: file.name, fileSizeBytes: file.size, schemaVersion: null, exportedAt: null, counts: emptyCounts() },
+        current: emptyCounts(),
+        diff: { willRemove: emptyCounts(), willInsert: emptyCounts() },
+        danglingReferences: [],
+        blockers: [(err as Error).message],
+        warnings: [],
+      }
+    }
+
+    const data = parsed.data
+
+    // ── Collect dangling references (jobs missing from the backup) ──
+    const dangling: string[] = []
+    const backupJobIds = new Set<string>((data.jobs ?? []).map((j) => j.id))
+      const backupCategoryIds = new Set<number>((data.categories ?? []).map((c) => c.id))
+
+      const shiftRows = (data.shifts as unknown as Record<string, unknown[]> | undefined) ?? {}
+      for (const dayRows of Object.values(shiftRows)) {
+        if (!Array.isArray(dayRows)) continue
+        for (const s of dayRows as Array<{ jobId?: string }>) {
+          if (s?.jobId && !backupJobIds.has(s.jobId)) {
+            dangling.push(`shift → unknown jobId "${s.jobId}"`)
+          }
+        }
+      }
+      for (const t of data.templates ?? []) {
+        if (t.jobId && !backupJobIds.has(t.jobId)) {
+                  dangling.push(`template "${t.name}" → unknown jobId "${t.jobId}"`)
+                }
+              }
+              const expensesMap = ((data as any).expenses as Record<string, unknown[]> | undefined) ?? {}
+              for (const monthRows of Object.values(expensesMap)) {
+                if (!Array.isArray(monthRows)) continue
+                for (const e of monthRows as Array<{ categoryId?: unknown }>) {
+                  const catId = e?.categoryId
+                  if (typeof catId === 'number' && !backupCategoryIds.has(catId)) {
+                    dangling.push(`expense → unknown categoryId "${catId}"`)
+                  }
+                }
+              }
+
+            const backupCounts: DomainCounts = {
+              jobs: (data.jobs ?? []).length,
+              templates: (data.templates ?? []).length,
+              shifts: countShifts(data.shifts),
+              categories: (data.categories ?? []).length,
+              expenses: Object.values(expensesMap).reduce(
+                (sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0),
+                0,
+              ),
+              goals: (data.goals ?? []).length,
+              notes: Object.keys(data.monthNotes ?? {}).length,
+              entries: Array.isArray((data as any).entries) ? ((data as any).entries as unknown[]).length : 0,
+            }
+
+    // Current DB state for this user.
+    const [jobs, templates, shifts, categories, expenses, goals, notes] = await Promise.all([
+      prisma.userJob.count({ where: { userId } }),
+      prisma.userTemplate.count({ where: { userId } }),
+      prisma.userShift.count({ where: { userId } }),
+      prisma.expenseCategory.count({ where: { userId } }),
+      prisma.expense.count({ where: { userId } }),
+      prisma.userBudgetGoal.count({ where: { userId } }),
+      prisma.userBudgetMonthMeta.count({ where: { userId } }),
+    ])
+
+    const currentCounts: DomainCounts = {
+      jobs, templates, shifts, categories, expenses, goals, notes, entries: 0,
+    }
+
+    const willRemove: DomainCounts =
+      mode === 'replace' ? { ...currentCounts, entries: 0 } : emptyCounts()
+
+    const willInsert: DomainCounts =
+      mode === 'replace'
+        ? { ...backupCounts }
+        : {
+            ...emptyCounts(),
+            // Merge keeps existing; approximate with backup counts (exact
+            // per-row dedupe is a later feature). Label as "up to" in UI.
+            jobs: backupCounts.jobs,
+            templates: backupCounts.templates,
+            shifts: backupCounts.shifts,
+            categories: backupCounts.categories,
+            expenses: backupCounts.expenses,
+            goals: backupCounts.goals,
+            notes: backupCounts.notes,
+          }
+
+    return {
+      mode,
+      format: parsed.format,
+      backup: {
+        fileName: file.name,
+        fileSizeBytes: file.size,
+        schemaVersion: parsed.schemaVersion,
+        exportedAt: parsed.exportedAt,
+        counts: backupCounts,
+      },
+      current: currentCounts,
+      diff: { willRemove, willInsert },
+      danglingReferences: dangling,
+      blockers: [],
+      warnings: parsed.warnings,
+    }
+  }
